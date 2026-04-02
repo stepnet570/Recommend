@@ -1,6 +1,7 @@
 package com.example.recommend
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -30,7 +31,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ExploreScreen() {
+fun ExploreScreen(onUserProfileClick: (String) -> Unit = {}) {
     var searchQuery by remember { mutableStateOf("") }
     var users by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
     var currentUserProfile by remember { mutableStateOf<UserProfile?>(null) }
@@ -132,7 +133,12 @@ fun ExploreScreen() {
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { onUserProfileClick(otherUser.uid) }
+                            ) {
                                 AsyncImage(
                                     model = otherUser.avatar.ifEmpty { "https://api.dicebear.com/7.x/avataaars/svg?seed=${otherUser.uid}" },
                                     contentDescription = "Avatar",

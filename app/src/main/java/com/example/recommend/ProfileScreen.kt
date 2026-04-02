@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -13,10 +14,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Bookmarks
+import androidx.compose.material.icons.filled.Campaign
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,16 +49,29 @@ import com.example.recommend.ui.theme.SurfacePastel
 import com.google.firebase.auth.FirebaseAuth
 import java.util.Locale
 
+private enum class ProfileSurface {
+    PERSONAL,
+    ADS_CAMPAIGNS
+}
+
 @Composable
 fun ProfileScreen(
     userProfile: UserProfile,
     myPosts: List<Post>,
     collections: List<PostCollection> = emptyList(),
     myOffers: List<AdOffer> = emptyList(),
+    followersCount: Int = 0,
+    participatingPromoCampaignsCount: Int = 0,
     onCollectionClick: (PostCollection) -> Unit = {},
+    onPostClick: (String) -> Unit = {},
+    onCreateCampaign: () -> Unit = {},
+    onOfferClick: (AdOffer) -> Unit = {},
+    onOfferPauseToggle: (AdOffer) -> Unit = {},
     onLogout: () -> Unit
 ) {
-    var selectedTab by remember { mutableIntStateOf(0) }
+    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    var profileSurfaceOrdinal by rememberSaveable { mutableIntStateOf(0) }
+    val profileSurface = if (profileSurfaceOrdinal == 0) ProfileSurface.PERSONAL else ProfileSurface.ADS_CAMPAIGNS
 
     LazyColumn(
         modifier = Modifier
@@ -102,95 +122,164 @@ fun ProfileScreen(
                         Spacer(modifier = Modifier.width(4.dp))
 
                         val scoreText =
-                            if (userProfile.trustScore > 0) String.format(Locale.US, "%.1f", userProfile.trustScore) else "New"
+                            if (userProfile.trustScore > 0) String.format(Locale.US, "%.1f", userProfile.trustScore) else "—"
                         Text(scoreText, fontWeight = FontWeight.Bold, color = MutedPastelGold, fontSize = 14.sp)
-                        if (userProfile.trustScore > 0) {
-                            Text(
-                                " (trust score)",
-                                color = MutedPastelGold.copy(alpha = 0.85f),
-                                fontSize = 12.sp,
-                                modifier = Modifier.padding(start = 4.dp)
-                            )
-                        }
+                        Text(
+                            " (trust score)",
+                            color = MutedPastelGold.copy(alpha = 0.85f),
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(start = 4.dp)
+                        )
                     }
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    when (profileSurface) {
+                        ProfileSurface.PERSONAL -> {
+                            Spacer(modifier = Modifier.height(20.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceEvenly
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("${myPosts.size}", style = AppTextStyles.Heading2.copy(fontSize = 24.sp))
+                                    Text(
+                                        "RECS",
+                                        style = AppTextStyles.BodySmall,
+                                        color = DarkPastelAnthracite.copy(alpha = 0.45f),
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("$followersCount", style = AppTextStyles.Heading2.copy(fontSize = 24.sp))
+                                    Text(
+                                        "FOLLOWERS",
+                                        style = AppTextStyles.BodySmall,
+                                        color = DarkPastelAnthracite.copy(alpha = 0.45f),
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("${userProfile.following.size}", style = AppTextStyles.Heading2.copy(fontSize = 24.sp))
+                                    Text(
+                                        "SUBSCRIPTIONS",
+                                        style = AppTextStyles.BodySmall,
+                                        color = DarkPastelAnthracite.copy(alpha = 0.45f),
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
 
-                    // TrustCoins wallet — grayscale gradient inset
-                    Box(
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(
-                                    brush = Brush.horizontalGradient(
-                                        colors = listOf(
-                                            GradientTop,
-                                            SurfaceMuted,
-                                            GradientMid.copy(alpha = 0.85f)
-                                        )
-                                    ),
-                                    shape = RoundedCornerShape(20.dp)
-                                )
-                                .border(1.dp, Color.White.copy(alpha = 0.5f), RoundedCornerShape(20.dp))
-                                .padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                Icons.Filled.AccountBalanceWallet,
-                                contentDescription = null,
-                                tint = MutedPastelGold,
-                                modifier = Modifier.size(28.dp)
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                userProfile.bio.ifEmpty { "Hi! I'm on TrustList." },
+                                style = AppTextStyles.BodyMedium,
+                                color = DarkPastelAnthracite.copy(alpha = 0.65f),
+                                textAlign = TextAlign.Center
                             )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    "Balance: ${userProfile.trustCoins}",
-                                    style = AppTextStyles.BodyMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = DarkPastelAnthracite
-                                )
-                                Text(
-                                    "TrustCoins",
-                                    style = AppTextStyles.BodySmall,
-                                    color = DarkPastelAnthracite.copy(alpha = 0.55f)
-                                )
+
+                            Spacer(modifier = Modifier.height(20.dp))
+                            OutlinedButton(
+                                onClick = { profileSurfaceOrdinal = 1 },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(50.dp),
+                                shape = RoundedCornerShape(16.dp),
+                                border = BorderStroke(1.dp, MutedPastelTeal),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MutedPastelTeal)
+                            ) {
+                                Text("Go to Ads Campaigns", style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(20.dp))
+                            }
+                        }
+
+                        ProfileSurface.ADS_CAMPAIGNS -> {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Box(modifier = Modifier.fillMaxWidth()) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(
+                                            brush = Brush.horizontalGradient(
+                                                colors = listOf(
+                                                    GradientTop,
+                                                    SurfaceMuted,
+                                                    GradientMid.copy(alpha = 0.85f)
+                                                )
+                                            ),
+                                            shape = RoundedCornerShape(20.dp)
+                                        )
+                                        .border(1.dp, Color.White.copy(alpha = 0.5f), RoundedCornerShape(20.dp))
+                                        .padding(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Filled.AccountBalanceWallet,
+                                        contentDescription = null,
+                                        tint = MutedPastelGold,
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            "Balance: ${userProfile.trustCoins}",
+                                            style = AppTextStyles.BodyMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = DarkPastelAnthracite
+                                        )
+                                        Text(
+                                            "TrustCoins",
+                                            style = AppTextStyles.BodySmall,
+                                            color = DarkPastelAnthracite.copy(alpha = 0.55f)
+                                        )
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(20.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceEvenly
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("${myOffers.size}", style = AppTextStyles.Heading2.copy(fontSize = 24.sp))
+                                    Text(
+                                        "LAUNCHED",
+                                        style = AppTextStyles.BodySmall,
+                                        color = DarkPastelAnthracite.copy(alpha = 0.45f),
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("$participatingPromoCampaignsCount", style = AppTextStyles.Heading2.copy(fontSize = 24.sp))
+                                    Text(
+                                        "AS PROMOTER",
+                                        style = AppTextStyles.BodySmall,
+                                        color = DarkPastelAnthracite.copy(alpha = 0.45f),
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(20.dp))
+                            OutlinedButton(
+                                onClick = { profileSurfaceOrdinal = 0 },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(50.dp),
+                                shape = RoundedCornerShape(16.dp),
+                                border = BorderStroke(1.dp, RichPastelCoral),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = RichPastelCoral)
+                            ) {
+                                Icon(Icons.Filled.Person, contentDescription = null, modifier = Modifier.size(20.dp))
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Personal cabinet", style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        userProfile.bio.ifEmpty { "Hi! I'm on TrustList." },
-                        style = AppTextStyles.BodyMedium,
-                        color = DarkPastelAnthracite.copy(alpha = 0.65f),
-                        textAlign = TextAlign.Center
-                    )
-
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
                     HorizontalDivider(color = SurfaceMuted)
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("${myPosts.size}", style = AppTextStyles.Heading2.copy(fontSize = 24.sp))
-                            Text("RECS", style = AppTextStyles.BodySmall, color = DarkPastelAnthracite.copy(alpha = 0.45f), fontWeight = FontWeight.Bold)
-                        }
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("${userProfile.following.size}", style = AppTextStyles.Heading2.copy(fontSize = 24.sp))
-                            Text("FOLLOWING", style = AppTextStyles.BodySmall, color = DarkPastelAnthracite.copy(alpha = 0.45f), fontWeight = FontWeight.Bold)
-                        }
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("${userProfile.trustCoins}", style = AppTextStyles.Heading2.copy(fontSize = 24.sp))
-                            Text("COINS", style = AppTextStyles.BodySmall, color = DarkPastelAnthracite.copy(alpha = 0.45f), fontWeight = FontWeight.Bold)
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
                     OutlinedButton(
                         onClick = {
@@ -212,109 +301,197 @@ fun ProfileScreen(
             }
         }
 
-        if (!userProfile.isBusiness) {
-            item {
-                TabRow(
-                    selectedTabIndex = selectedTab,
-                    containerColor = Color.Transparent,
-                    contentColor = RichPastelCoral,
-                    indicator = { tabPositions ->
-                        TabRowDefaults.SecondaryIndicator(
-                            Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
-                            color = MutedPastelTeal.copy(alpha = 0.35f)
-                        )
-                    },
-                    divider = {}
-                ) {
-                    Tab(
-                        selected = selectedTab == 0,
-                        onClick = { selectedTab = 0 },
-                        text = { Text("My recs", style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold) }
-                    )
-                    Tab(
-                        selected = selectedTab == 1,
-                        onClick = { selectedTab = 1 },
-                        text = { Text("Collections", style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold) }
-                    )
-                }
-                Spacer(modifier = Modifier.height(16.dp))
+        when (profileSurface) {
+            ProfileSurface.PERSONAL -> {
+                personalRecsAndCollectionsSection(
+                    selectedTab = selectedTab,
+                    onSelectedTab = { selectedTab = it },
+                    myPosts = myPosts,
+                    collections = collections,
+                    onPostClick = onPostClick,
+                    onCollectionClick = onCollectionClick
+                )
             }
 
-            if (selectedTab == 0) {
-                if (myPosts.isEmpty()) {
-                    item {
-                        EmptyStateCard("No recommendations yet")
-                    }
-                } else {
-                    items(myPosts) { post ->
-                        PostSmallCard(post)
-                    }
-                }
-            } else {
-                if (collections.isEmpty()) {
-                    item {
-                        EmptyStateCard("No collections yet")
-                    }
-                } else {
-                    val chunkedCollections = collections.chunked(2)
-                    items(chunkedCollections) { rowItems ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            rowItems.forEach { collection ->
-                                CollectionCard(
-                                    collection = collection,
-                                    modifier = Modifier.weight(1f),
-                                    onClick = { onCollectionClick(collection) }
-                                )
-                            }
-                            if (rowItems.size == 1) {
-                                Spacer(modifier = Modifier.weight(1f))
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(16.dp))
-                    }
-                }
+            ProfileSurface.ADS_CAMPAIGNS -> {
+                adsDashboardSection(
+                    myOffers = myOffers,
+                    isBusiness = userProfile.isBusiness,
+                    onCreateCampaign = onCreateCampaign,
+                    onOfferClick = onOfferClick,
+                    onOfferPauseToggle = onOfferPauseToggle
+                )
+            }
+        }
+    }
+}
+
+private fun LazyListScope.adsDashboardSection(
+    myOffers: List<AdOffer>,
+    isBusiness: Boolean,
+    onCreateCampaign: () -> Unit,
+    onOfferClick: (AdOffer) -> Unit,
+    onOfferPauseToggle: (AdOffer) -> Unit
+) {
+    item {
+        Text(
+            "Ad dashboard",
+            style = AppTextStyles.Heading2.copy(fontSize = 20.sp),
+            color = DarkPastelAnthracite,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp)
+        )
+        Text(
+            "Your campaigns and rewards.",
+            style = AppTextStyles.BodySmall,
+            color = DarkPastelAnthracite.copy(alpha = 0.5f),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp)
+        )
+        if (isBusiness) {
+            OutlinedButton(
+                onClick = onCreateCampaign,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, RichPastelCoral),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = RichPastelCoral)
+            ) {
+                Icon(Icons.Filled.Campaign, contentDescription = null, modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("New campaign", style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold)
+            }
+            Spacer(modifier = Modifier.height(24.dp))
+        } else {
+            Text(
+                "Business accounts can launch sponsored campaigns from the Ads section.",
+                style = AppTextStyles.BodySmall,
+                color = DarkPastelAnthracite.copy(alpha = 0.5f),
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+        }
+    }
+    if (!isBusiness) {
+        if (myOffers.isNotEmpty()) {
+            items(myOffers, key = { it.id }) { offer ->
+                AdOfferProfileCard(
+                    offer = offer,
+                    onCardClick = { onOfferClick(offer) },
+                    showPauseButton = false,
+                    onPauseClick = {}
+                )
+            }
+        }
+    } else if (myOffers.isEmpty()) {
+        item {
+            EmptyStateCard("No campaigns yet. Tap New campaign or + to launch your first offer.")
+        }
+    } else {
+        items(myOffers, key = { it.id }) { offer ->
+            AdOfferProfileCard(
+                offer = offer,
+                onCardClick = { onOfferClick(offer) },
+                showPauseButton = true,
+                onPauseClick = { onOfferPauseToggle(offer) }
+            )
+        }
+    }
+}
+
+private fun LazyListScope.personalRecsAndCollectionsSection(
+    selectedTab: Int,
+    onSelectedTab: (Int) -> Unit,
+    myPosts: List<Post>,
+    collections: List<PostCollection>,
+    onPostClick: (String) -> Unit,
+    onCollectionClick: (PostCollection) -> Unit
+) {
+    item {
+        TabRow(
+            selectedTabIndex = selectedTab,
+            containerColor = Color.Transparent,
+            contentColor = RichPastelCoral,
+            indicator = { tabPositions ->
+                TabRowDefaults.SecondaryIndicator(
+                    Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                    color = MutedPastelTeal.copy(alpha = 0.35f)
+                )
+            },
+            divider = {}
+        ) {
+            Tab(
+                selected = selectedTab == 0,
+                onClick = { onSelectedTab(0) },
+                text = { Text("My recs", style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold) }
+            )
+            Tab(
+                selected = selectedTab == 1,
+                onClick = { onSelectedTab(1) },
+                text = { Text("Collections", style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold) }
+            )
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+    }
+
+    if (selectedTab == 0) {
+        if (myPosts.isEmpty()) {
+            item {
+                EmptyStateCard("No recommendations yet")
             }
         } else {
-            item {
-                Text(
-                    "Ad dashboard",
-                    style = AppTextStyles.Heading2.copy(fontSize = 20.sp),
-                    color = DarkPastelAnthracite,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 8.dp)
-                )
-                Text(
-                    "Your live campaigns and rewards.",
-                    style = AppTextStyles.BodySmall,
-                    color = DarkPastelAnthracite.copy(alpha = 0.5f),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 16.dp)
-                )
+            items(myPosts) { post ->
+                PostSmallCard(post = post, onClick = { onPostClick(post.id) })
             }
-            if (myOffers.isEmpty()) {
-                item {
-                    EmptyStateCard("No campaigns yet. Tap + to launch your first offer.")
+        }
+    } else {
+        if (collections.isEmpty()) {
+            item {
+                EmptyStateCard("No collections yet")
+            }
+        } else {
+            val chunkedCollections = collections.chunked(2)
+            items(chunkedCollections) { rowItems ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    rowItems.forEach { collection ->
+                        CollectionCard(
+                            collection = collection,
+                            modifier = Modifier.weight(1f),
+                            onClick = { onCollectionClick(collection) }
+                        )
+                    }
+                    if (rowItems.size == 1) {
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
                 }
-            } else {
-                items(myOffers, key = { it.id }) { offer ->
-                    AdOfferProfileCard(offer = offer)
-                }
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
     }
 }
 
 @Composable
-fun AdOfferProfileCard(offer: AdOffer) {
+fun AdOfferProfileCard(
+    offer: AdOffer,
+    onCardClick: (() -> Unit)? = null,
+    showPauseButton: Boolean = false,
+    onPauseClick: () -> Unit = {}
+) {
+    val isActive = offer.status.equals("active", ignoreCase = true)
+    val cardModifier = Modifier
+        .fillMaxWidth()
+        .padding(bottom = 12.dp)
+        .then(
+            if (onCardClick != null) Modifier.clickable { onCardClick() } else Modifier
+        )
+
     ConvexCardBox(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 12.dp),
+        modifier = cardModifier,
         shape = RoundedCornerShape(24.dp),
         elevation = 22.dp
     ) {
@@ -352,35 +529,71 @@ fun AdOfferProfileCard(offer: AdOffer) {
                         )
                     }
                 }
-                Column(horizontalAlignment = Alignment.End) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            Icons.Filled.AccountBalanceWallet,
-                            contentDescription = null,
-                            tint = MutedPastelGold,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (showPauseButton) {
+                        IconButton(onClick = onPauseClick) {
+                            Icon(
+                                if (isActive) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                contentDescription = if (isActive) "Pause" else "Resume",
+                                tint = MutedPastelTeal
+                            )
+                        }
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Filled.AccountBalanceWallet,
+                                contentDescription = null,
+                                tint = MutedPastelGold,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                "${offer.rewardCoins}",
+                                style = AppTextStyles.Heading2.copy(fontSize = 20.sp),
+                                fontWeight = FontWeight.Bold,
+                                color = RichPastelCoral
+                            )
+                        }
                         Text(
-                            "${offer.rewardCoins}",
-                            style = AppTextStyles.Heading2.copy(fontSize = 20.sp),
-                            fontWeight = FontWeight.Bold,
-                            color = RichPastelCoral
+                            "TrustCoins",
+                            style = AppTextStyles.BodySmall,
+                            color = DarkPastelAnthracite.copy(alpha = 0.45f)
                         )
                     }
+                }
+            }
+            if (offer.description.isNotBlank()) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    offer.description,
+                    style = AppTextStyles.BodySmall,
+                    color = DarkPastelAnthracite.copy(alpha = 0.65f),
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = 18.sp
+                )
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Min. trust ${String.format(Locale.US, "%.1f", offer.minTrustScore)}",
+                    style = AppTextStyles.BodySmall,
+                    color = DarkPastelAnthracite.copy(alpha = 0.55f)
+                )
+                val dateStr = formatAdOfferDate(offer.createdAt)
+                if (dateStr.isNotEmpty()) {
                     Text(
-                        "TrustCoins",
+                        dateStr,
                         style = AppTextStyles.BodySmall,
-                        color = DarkPastelAnthracite.copy(alpha = 0.45f)
+                        color = DarkPastelAnthracite.copy(alpha = 0.4f)
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                "Min. trust ${String.format(Locale.US, "%.1f", offer.minTrustScore)}",
-                style = AppTextStyles.BodySmall,
-                color = DarkPastelAnthracite.copy(alpha = 0.55f)
-            )
         }
     }
 }
@@ -399,9 +612,12 @@ fun EmptyStateCard(text: String) {
 }
 
 @Composable
-fun PostSmallCard(post: Post) {
+fun PostSmallCard(post: Post, onClick: () -> Unit = {}) {
     ConvexCardBox(
-        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 12.dp)
+            .clickable { onClick() },
         shape = RoundedCornerShape(24.dp),
         elevation = 20.dp
     ) {

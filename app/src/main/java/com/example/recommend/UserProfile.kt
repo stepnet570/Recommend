@@ -26,6 +26,8 @@ data class UserProfile(
     val avatar: String = "",
     val following: List<String> = emptyList(),
     val trustScore: Double = 0.0,
+    /** uid of rater -> stars 1..5 (stored as map on user doc) */
+    val trustRatings: Map<String, Int> = emptyMap(),
     val isBusiness: Boolean = false,
     val trustCoins: Int = 0,
     val businessProfile: BusinessData? = null
@@ -56,9 +58,24 @@ fun DocumentSnapshot.toUserProfileOrNull(): UserProfile? {
 
     val businessProfile = parseBusinessProfile(get("businessProfile")) ?: parsed.businessProfile
 
+    val trustRatingsRaw = get("trustRatings")
+    val trustRatings = when (trustRatingsRaw) {
+        is Map<*, *> -> trustRatingsRaw.mapNotNull { (k, v) ->
+            val key = k as? String ?: return@mapNotNull null
+            val intVal = when (v) {
+                is Long -> v.toInt()
+                is Int -> v
+                else -> null
+            } ?: return@mapNotNull null
+            key to intVal.coerceIn(1, 5)
+        }.toMap()
+        else -> emptyMap()
+    }
+
     return parsed.copy(
         trustScore = trustScore,
         trustCoins = trustCoins,
+        trustRatings = trustRatings,
         isBusiness = isBusiness,
         businessProfile = businessProfile
     )

@@ -45,7 +45,8 @@ fun RequestDetailScreen(
     request: PackRequest,
     answers: List<Answer>,
     users: List<UserProfile>,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onUserProfileClick: (String) -> Unit = {}
 ) {
     BackHandler(onBack = onBack)
 
@@ -93,9 +94,22 @@ fun RequestDetailScreen(
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MutedPastelTeal)
                 }
                 Spacer(modifier = Modifier.width(8.dp))
-                Column {
-                    Text("Signal from ${author.name.split(" ")[0]}", style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = DarkPastelAnthracite)
-                    Text("The pack is collecting picks", style = AppTextStyles.BodySmall, color = DarkPastelAnthracite.copy(alpha = 0.55f))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable(enabled = request.userId.isNotBlank()) { onUserProfileClick(request.userId) }
+                ) {
+                    AsyncImage(
+                        model = author.avatar.ifEmpty { "https://api.dicebear.com/7.x/avataaars/svg?seed=${author.uid}" },
+                        contentDescription = null,
+                        modifier = Modifier.size(40.dp).clip(CircleShape).background(SurfaceMuted)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column {
+                        Text("Signal from ${author.name.split(" ")[0]}", style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = DarkPastelAnthracite)
+                        Text("The pack is collecting picks", style = AppTextStyles.BodySmall, color = DarkPastelAnthracite.copy(alpha = 0.55f))
+                    }
                 }
             }
 
@@ -143,7 +157,13 @@ fun RequestDetailScreen(
                 } else {
                     items(answers) { ans ->
                         val ansAuthor = users.find { it.uid == ans.userId } ?: UserProfile(name = "Someone")
-                        Row(modifier = Modifier.fillMaxWidth().background(Color.White, RoundedCornerShape(20.dp)).padding(16.dp)) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color.White, RoundedCornerShape(20.dp))
+                                .padding(16.dp)
+                                .clickable(enabled = ans.userId.isNotBlank()) { onUserProfileClick(ans.userId) }
+                        ) {
                             AsyncImage(
                                 model = ansAuthor.avatar.ifEmpty { "https://api.dicebear.com/7.x/avataaars/svg?seed=${ansAuthor.uid}" },
                                 contentDescription = null,

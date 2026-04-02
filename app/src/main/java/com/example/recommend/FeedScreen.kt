@@ -29,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
 import coil.compose.AsyncImage
 import com.example.recommend.ui.theme.AppTextStyles
 import com.example.recommend.ui.theme.DarkPastelAnthracite
@@ -50,8 +51,18 @@ data class Post(
     val imageUrl: String? = null,
     val authorName: String = "Alex",
     val authorHandle: String = "@alex",
-    val isSponsored: Boolean = false
+    val isSponsored: Boolean = false,
+    /** uid -> stars 1..5 from other users */
+    val ratingsByUser: Map<String, Int> = emptyMap(),
+    /** uids who liked the post (Firestore map `likes` keys) */
+    val likesByUser: Set<String> = emptySet()
 )
+
+fun Post.averageAudienceRatingStars(): Int? {
+    if (ratingsByUser.isEmpty()) return null
+    val avg = ratingsByUser.values.average()
+    return avg.roundToInt().coerceIn(1, 5)
+}
 
 data class PackRequest(
     val id: String = "",
@@ -73,7 +84,13 @@ fun FeedScreen(
     savedPostIds: Set<String> = emptySet(),
     onAskPackClick: () -> Unit,
     onRequestClick: (PackRequest) -> Unit,
-    onSaveClick: (String) -> Unit
+    onSaveClick: (String) -> Unit,
+    onUserProfileClick: (String) -> Unit = {},
+    onRequestAuthorProfileClick: (String) -> Unit = {},
+    viewerUid: String? = null,
+    onAudienceRate: (String, Int) -> Unit = { _, _ -> },
+    onOpenPost: ((String) -> Unit)? = null,
+    onLikeToggle: (String) -> Unit = {}
 ) {
     val scheme = MaterialTheme.colorScheme
 
@@ -91,7 +108,7 @@ fun FeedScreen(
         ) {
             item { SearchBarWidget() }
 
-            item { LiquidRadar(posts = posts) }
+            item { LiquidRadar(posts = posts, onUserProfileClick = onUserProfileClick) }
 
             if (requests.isNotEmpty()) {
                 item {
@@ -120,13 +137,18 @@ fun FeedScreen(
                                                 listOf(Color(0xFF3A3A3A), Color(0xFF1A1A1A), Color(0xFF2C2C2C))
                                             )
                                         )
-                                        .clickable { onRequestClick(req) }
                                 ) {
                                     Column(
                                         modifier = Modifier.padding(20.dp).fillMaxSize(),
                                         verticalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier
+                                                .clickable(enabled = req.userId.isNotBlank()) {
+                                                    onRequestAuthorProfileClick(req.userId)
+                                                }
+                                        ) {
                                             AsyncImage(
                                                 model = author.avatar.ifEmpty { "https://api.dicebear.com/7.x/avataaars/svg?seed=${author.uid}" },
                                                 contentDescription = null,
@@ -142,7 +164,16 @@ fun FeedScreen(
                                             )
                                         }
 
-                                        Text(req.text, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Black, maxLines = 2, overflow = TextOverflow.Ellipsis, lineHeight = 24.sp)
+                                        Text(
+                                            req.text,
+                                            color = Color.White,
+                                            fontSize = 20.sp,
+                                            fontWeight = FontWeight.Black,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis,
+                                            lineHeight = 24.sp,
+                                            modifier = Modifier.clickable { onRequestClick(req) }
+                                        )
 
                                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -194,7 +225,13 @@ fun FeedScreen(
                     PostCard(
                         post = post,
                         isSaved = savedPostIds.contains(post.id),
-                        onSaveClick = onSaveClick
+                        onSaveClick = onSaveClick,
+                        users = users,
+                        onUserProfileClick = onUserProfileClick,
+                        viewerUid = viewerUid,
+                        onAudienceRate = onAudienceRate,
+                        onOpenPost = onOpenPost,
+                        onLikeToggle = onLikeToggle
                     )
                 }
             }
@@ -228,7 +265,10 @@ fun SearchBarWidget() {
 }
 
 @Composable
-fun LiquidRadar(posts: List<Post>) {
+fun LiquidRadar(
+    posts: List<Post>,
+    onUserProfileClick: (String) -> Unit = {}
+) {
     val radarPosts = posts.take(3)
 
     Box(
@@ -281,7 +321,14 @@ fun LiquidRadar(posts: List<Post>) {
                 val pos = positions[index % positions.size]
                 Box(modifier = Modifier.align(pos.first).offset(x = pos.second.first, y = pos.second.second)) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Surface(shape = RoundedCornerShape(16.dp), color = SurfacePastel.copy(alpha = 0.98f), shadowElevation = 4.dp, modifier = Modifier.padding(bottom = 4.dp)) {
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = SurfacePastel.copy(alpha = 0.98f),
+                            shadowElevation = 4.dp,
+                            modifier = Modifier
+                                .padding(bottom = 4.dp)
+                                .clickable(enabled = post.userId.isNotBlank()) { onUserProfileClick(post.userId) }
+                        ) {
                             Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Box(modifier = Modifier.size(20.dp).clip(CircleShape).background(SurfaceMuted))
                                 Spacer(Modifier.width(6.dp))
@@ -408,9 +455,22 @@ fun BentoBoxGrid(posts: List<Post>, onAskPackClick: () -> Unit) {
 fun PostCard(
     post: Post,
     isSaved: Boolean = false,
-    onSaveClick: (String) -> Unit = {}
+    onSaveClick: (String) -> Unit = {},
+    users: List<UserProfile> = emptyList(),
+    onUserProfileClick: (String) -> Unit = {},
+    viewerUid: String? = null,
+    onAudienceRate: (String, Int) -> Unit = { _, _ -> },
+    onOpenPost: ((String) -> Unit)? = null,
+    onLikeToggle: (String) -> Unit = {}
 ) {
+    val authorUser = users.find { it.uid == post.userId }
+    val avatarModel = authorUser?.avatar?.takeIf { it.isNotEmpty() }
+        ?: "https://api.dicebear.com/7.x/avataaars/svg?seed=${post.userId.ifEmpty { post.authorName }}"
     val iconTint = MutedPastelTeal
+    val isOwnPost = post.userId.isNotBlank() && viewerUid != null && post.userId == viewerUid
+    val canRateOthers = viewerUid != null && !isOwnPost
+    val myAudienceStars = viewerUid?.let { post.ratingsByUser[it] } ?: 0
+    val audienceAvg = post.averageAudienceRatingStars()
     val cardBorder = if (post.isSponsored) {
         Modifier.border(2.dp, MutedPastelGold, RoundedCornerShape(32.dp))
     } else Modifier
@@ -434,8 +494,19 @@ fun PostCard(
                     Text("PARTNER", color = MutedPastelGold, style = AppTextStyles.BodySmall, fontWeight = FontWeight.Bold)
                 }
             }
-            Row(modifier = Modifier.fillMaxWidth().padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(SurfaceMuted))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp)
+                    .clickable(enabled = post.userId.isNotBlank()) { onUserProfileClick(post.userId) },
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                AsyncImage(
+                    model = avatarModel,
+                    contentDescription = null,
+                    modifier = Modifier.size(40.dp).clip(CircleShape).background(SurfaceMuted),
+                    contentScale = ContentScale.Crop
+                )
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(post.authorName, style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold)
@@ -443,24 +514,35 @@ fun PostCard(
                 }
                 Text("Today", style = AppTextStyles.BodySmall, color = DarkPastelAnthracite.copy(alpha = 0.45f))
             }
+            val openPostModifier = if (onOpenPost != null) {
+                Modifier.clickable { onOpenPost.invoke(post.id) }
+            } else Modifier
+
             if (post.imageUrl != null) {
                 AsyncImage(
                     model = post.imageUrl,
                     contentDescription = "Post photo",
-                    modifier = Modifier.fillMaxWidth().height(200.dp).background(SurfaceMuted),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(200.dp)
+                        .background(SurfaceMuted)
+                        .then(openPostModifier),
                     contentScale = ContentScale.Crop
                 )
             }
-            Column(modifier = Modifier.padding(20.dp)) {
+            Column(modifier = Modifier.padding(20.dp).then(openPostModifier)) {
                 Box(modifier = Modifier.background(SurfaceMuted, RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 4.dp)) {
                     Text(post.category.uppercase(), style = AppTextStyles.BodySmall, fontWeight = FontWeight.Bold, color = DarkPastelAnthracite.copy(alpha = 0.7f))
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Text(post.title, style = AppTextStyles.Heading2.copy(fontSize = 20.sp), modifier = Modifier.weight(1f))
-                    Row {
-                        repeat(post.rating) {
-                            Icon(Icons.Filled.Star, contentDescription = null, tint = MutedPastelGold, modifier = Modifier.size(16.dp))
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text("Author", style = AppTextStyles.BodySmall, color = DarkPastelAnthracite.copy(alpha = 0.45f), fontSize = 10.sp)
+                        Row {
+                            repeat(post.rating.coerceIn(1, 5)) {
+                                Icon(Icons.Filled.Star, contentDescription = null, tint = MutedPastelGold, modifier = Modifier.size(16.dp))
+                            }
                         }
                     }
                 }
@@ -472,15 +554,80 @@ fun PostCard(
                 }
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(post.description, style = AppTextStyles.BodyMedium, color = DarkPastelAnthracite.copy(alpha = 0.85f), lineHeight = 20.sp)
+            }
 
-                HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), color = SurfaceMuted)
+            Column(modifier = Modifier.padding(horizontal = 20.dp)) {
+                if (audienceAvg != null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            "Community (${post.ratingsByUser.size})",
+                            style = AppTextStyles.BodySmall,
+                            color = DarkPastelAnthracite.copy(alpha = 0.55f),
+                            fontWeight = FontWeight.Bold
+                        )
+                        Row {
+                            repeat(audienceAvg) {
+                                Icon(Icons.Filled.Star, contentDescription = null, tint = MutedPastelTeal, modifier = Modifier.size(16.dp))
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                }
+                if (canRateOthers) {
+                    Text(
+                        "Your rating",
+                        style = AppTextStyles.BodySmall,
+                        color = DarkPastelAnthracite.copy(alpha = 0.55f),
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        for (star in 1..5) {
+                            val selected = myAudienceStars >= star
+                            Icon(
+                                Icons.Filled.Star,
+                                contentDescription = "Rate $star",
+                                tint = if (selected) MutedPastelGold else SurfaceMuted,
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clickable { onAudienceRate(post.id, star) }
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+            }
+
+            Column(modifier = Modifier.padding(20.dp)) {
+                HorizontalDivider(modifier = Modifier.padding(bottom = 16.dp), color = SurfaceMuted)
 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = { /* Like */ }) {
-                            Icon(Icons.Filled.FavoriteBorder, contentDescription = "Like", tint = iconTint, modifier = Modifier.size(20.dp))
+                        val liked = viewerUid != null && post.likesByUser.contains(viewerUid)
+                        IconButton(
+                            onClick = { onLikeToggle(post.id) },
+                            enabled = viewerUid != null
+                        ) {
+                            Icon(
+                                if (liked) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                                contentDescription = if (liked) "Unlike" else "Like",
+                                tint = if (liked) RichPastelCoral else iconTint,
+                                modifier = Modifier.size(20.dp)
+                            )
                         }
-                        Text("12", style = AppTextStyles.BodyMedium, color = DarkPastelAnthracite.copy(alpha = 0.5f))
+                        Text(
+                            "${post.likesByUser.size}",
+                            style = AppTextStyles.BodyMedium,
+                            color = DarkPastelAnthracite.copy(alpha = 0.5f)
+                        )
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         IconButton(onClick = { onSaveClick(post.id) }) {
@@ -494,7 +641,6 @@ fun PostCard(
                         IconButton(onClick = { /* Share */ }) {
                             Icon(Icons.Filled.Share, contentDescription = "Share", tint = iconTint, modifier = Modifier.size(20.dp))
                         }
-                        Text("Reply", style = AppTextStyles.BodyMedium, color = DarkPastelAnthracite.copy(alpha = 0.5f))
                     }
                 }
             }

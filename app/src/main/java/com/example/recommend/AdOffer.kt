@@ -1,6 +1,14 @@
 package com.example.recommend
 
 import com.google.firebase.firestore.DocumentSnapshot
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+fun formatAdOfferDate(createdAt: Long): String {
+    if (createdAt <= 0L) return ""
+    return SimpleDateFormat("d MMM yyyy", Locale.getDefault()).format(Date(createdAt))
+}
 
 data class AdOffer(
     val id: String = "",

@@ -1,11 +1,18 @@
 package com.example.recommend
 
+import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -20,8 +27,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.recommend.ui.theme.AppTextStyles
 import com.example.recommend.ui.theme.DarkPastelAnthracite
 import com.example.recommend.ui.theme.MutedPastelGold
@@ -30,6 +39,9 @@ import com.example.recommend.ui.theme.SoftPastelMint
 import com.example.recommend.ui.theme.SurfaceMuted
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.storage.FirebaseStorage
+import com.google.firebase.storage.StorageMetadata
+import java.util.concurrent.Executors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,11 +56,20 @@ fun AddScreen(
     var selectedCategory by remember { mutableStateOf("Food") }
     var rating by remember { mutableStateOf(5) }
     var isUploading by remember { mutableStateOf(false) }
+    var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
 
     val context = LocalContext.current
     val db = FirebaseFirestore.getInstance()
     val auth = FirebaseAuth.getInstance()
+    val storage = FirebaseStorage.getInstance()
     val scheme = MaterialTheme.colorScheme
+
+    val pickImage = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? -> selectedImageUri = uri }
+
+    val compressExecutor = remember { Executors.newSingleThreadExecutor() }
+    val mainHandler = remember { Handler(Looper.getMainLooper()) }
 
     val categories = listOf(
         CategoryItem("Service", Icons.Filled.Build, "service"),
@@ -57,14 +78,12 @@ fun AddScreen(
         CategoryItem("Beauty", Icons.Filled.Face, "beauty")
     )
 
-    fun savePostToFirebase() {
-        isUploading = true
+    fun writePostDocument(imageUrl: String?) {
         val currentUser = auth.currentUser
-
         val authorName = currentUserProfile?.name?.takeIf { it.isNotBlank() }
             ?: currentUser?.email?.substringBefore("@")?.replaceFirstChar { it.uppercase() } ?: "Anonymous"
 
-        val postData = hashMapOf(
+        val postData = hashMapOf<String, Any>(
             "userId" to (currentUser?.uid ?: ""),
             "title" to title,
             "description" to description,
@@ -75,6 +94,9 @@ fun AddScreen(
             "authorHandle" to "@${authorName.lowercase()}",
             "createdAt" to System.currentTimeMillis()
         )
+        if (!imageUrl.isNullOrBlank()) {
+            postData["imageUrl"] = imageUrl
+        }
 
         db.trustListDataRoot()
             .collection("posts")
@@ -88,6 +110,58 @@ fun AddScreen(
                 isUploading = false
                 Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
             }
+    }
+
+    fun savePostToFirebase() {
+        val currentUser = auth.currentUser ?: run {
+            Toast.makeText(context, "Not signed in", Toast.LENGTH_SHORT).show()
+            return
+        }
+        isUploading = true
+        val uri = selectedImageUri
+        if (uri != null) {
+            compressExecutor.execute {
+                val bytes = ImageCompress.compressUriToJpeg(
+                    context,
+                    uri,
+                    ImageCompress.POST_MAX_SIDE_PX,
+                    ImageCompress.POST_JPEG_QUALITY
+                )
+                if (bytes == null || bytes.isEmpty()) {
+                    mainHandler.post {
+                        isUploading = false
+                        Toast.makeText(context, "Could not process image", Toast.LENGTH_SHORT).show()
+                    }
+                    return@execute
+                }
+                val path = "posts/${currentUser.uid}/${System.currentTimeMillis()}.jpg"
+                val ref = storage.reference.child(path)
+                val metadata = StorageMetadata.Builder().setContentType("image/jpeg").build()
+                ref.putBytes(bytes, metadata)
+                    .addOnSuccessListener {
+                        ref.downloadUrl
+                            .addOnSuccessListener { download ->
+                                mainHandler.post {
+                                    writePostDocument(download.toString())
+                                }
+                            }
+                            .addOnFailureListener { e ->
+                                mainHandler.post {
+                                    isUploading = false
+                                    Toast.makeText(context, "Photo URL: ${e.message}", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                    }
+                    .addOnFailureListener { e ->
+                        mainHandler.post {
+                            isUploading = false
+                            Toast.makeText(context, "Upload failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+            }
+        } else {
+            writePostDocument(null)
+        }
     }
 
     Scaffold(
@@ -140,14 +214,54 @@ fun AddScreen(
                     ) {
                         Column(modifier = Modifier.padding(24.dp)) {
 
-                            Text("PHOTO (COMING SOON)", style = AppTextStyles.BodySmall, color = DarkPastelAnthracite.copy(alpha = 0.45f), letterSpacing = 1.sp)
+                            Text("PHOTO", style = AppTextStyles.BodySmall, color = DarkPastelAnthracite.copy(alpha = 0.45f), letterSpacing = 1.sp)
                             Spacer(modifier = Modifier.height(8.dp))
                             Box(
-                                modifier = Modifier.fillMaxWidth().height(120.dp).clip(RoundedCornerShape(24.dp))
-                                    .background(SurfaceMuted).border(2.dp, SurfaceMuted, RoundedCornerShape(24.dp)),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(160.dp)
+                                    .clip(RoundedCornerShape(24.dp))
+                                    .background(SurfaceMuted)
+                                    .border(2.dp, SurfaceMuted, RoundedCornerShape(24.dp))
+                                    .clickable {
+                                        pickImage.launch(
+                                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                        )
+                                    },
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text("Photo upload will be available in a future update", style = AppTextStyles.BodySmall, color = DarkPastelAnthracite.copy(alpha = 0.5f))
+                                if (selectedImageUri != null) {
+                                    AsyncImage(
+                                        model = selectedImageUri,
+                                        contentDescription = "Selected photo",
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                    IconButton(
+                                        onClick = { selectedImageUri = null },
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
+                                            .padding(8.dp)
+                                            .background(Color.Black.copy(alpha = 0.45f), CircleShape)
+                                    ) {
+                                        Icon(Icons.Filled.Close, contentDescription = "Remove photo", tint = Color.White)
+                                    }
+                                } else {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Icon(
+                                            Icons.Filled.AddPhotoAlternate,
+                                            contentDescription = null,
+                                            tint = MutedPastelTeal,
+                                            modifier = Modifier.size(40.dp)
+                                        )
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(
+                                            "Tap to add a photo (optional)",
+                                            style = AppTextStyles.BodySmall,
+                                            color = DarkPastelAnthracite.copy(alpha = 0.55f)
+                                        )
+                                    }
+                                }
                             }
 
                             Spacer(modifier = Modifier.height(24.dp))
@@ -224,7 +338,13 @@ fun AddScreen(
                                 enabled = !isUploading && title.isNotBlank() && description.isNotBlank()
                             ) {
                                 if (isUploading) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
-                                else Text("Publish", style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                else Text(
+                                    "Publish",
+                                    style = AppTextStyles.BodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 16.sp,
+                                    color = scheme.onPrimary
+                                )
                             }
                         }
                     }
@@ -247,8 +367,13 @@ fun RowScope.CategoryButton(item: CategoryItem, isSelected: Boolean, onClick: (S
             contentColor = if (isSelected) scheme.onPrimary else DarkPastelAnthracite
         )
     ) {
-        Icon(item.icon, contentDescription = null, tint = if (isSelected) Color.White else MutedPastelTeal, modifier = Modifier.size(18.dp))
+        Icon(item.icon, contentDescription = null, tint = if (isSelected) scheme.onPrimary else MutedPastelTeal, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(8.dp))
-        Text(item.label, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        Text(
+            item.label,
+            fontWeight = FontWeight.Bold,
+            fontSize = 14.sp,
+            color = if (isSelected) scheme.onPrimary else DarkPastelAnthracite
+        )
     }
 }

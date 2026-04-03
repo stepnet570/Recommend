@@ -57,7 +57,7 @@ fun AuthScreen(onAuthSuccess: () -> Unit) {
         errorMessage = ""
 
         if (isLoginMode) {
-            auth.signInWithEmailAndPassword(email, password)
+            auth.signInWithEmailAndPassword(email.trim(), password)
                 .addOnSuccessListener { onAuthSuccess() }
                 .addOnFailureListener {
                     isLoading = false
@@ -257,7 +257,8 @@ fun AuthScreen(onAuthSuccess: () -> Unit) {
                             text = if (isLoginMode) "Sign in" else "Sign up",
                             style = AppTextStyles.BodyMedium,
                             fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                            fontSize = 16.sp
+                            fontSize = 16.sp,
+                            color = scheme.onPrimary
                         )
                     }
                 }

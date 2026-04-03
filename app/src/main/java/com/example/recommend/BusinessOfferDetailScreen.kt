@@ -33,7 +33,9 @@ import java.util.Locale
 fun BusinessOfferDetailScreen(
     offer: AdOffer,
     onBack: () -> Unit,
-    onPauseToggle: (AdOffer) -> Unit
+    onPauseToggle: (AdOffer) -> Unit,
+    /** Only the business that created the offer may pause or resume it. */
+    canManageCampaign: Boolean = false
 ) {
     BackHandler(onBack = onBack)
 
@@ -183,30 +185,33 @@ fun BusinessOfferDetailScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            if (canManageCampaign) {
+                Spacer(modifier = Modifier.height(20.dp))
 
-            Button(
-                onClick = { onPauseToggle(offer) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(52.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isActive) SurfaceMuted else scheme.primary,
-                    contentColor = if (isActive) DarkPastelAnthracite else scheme.onPrimary
-                )
-            ) {
-                Icon(
-                    if (isActive) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    contentDescription = null,
-                    modifier = Modifier.size(22.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    if (isActive) "Pause campaign" else "Resume campaign",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
-                )
+                Button(
+                    onClick = { onPauseToggle(offer) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isActive) SurfaceMuted else scheme.primary,
+                        contentColor = if (isActive) DarkPastelAnthracite else scheme.onPrimary
+                    )
+                ) {
+                    Icon(
+                        if (isActive) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                        contentDescription = null,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        if (isActive) "Pause campaign" else "Resume campaign",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        color = if (isActive) DarkPastelAnthracite else scheme.onPrimary
+                    )
+                }
             }
         }
     }

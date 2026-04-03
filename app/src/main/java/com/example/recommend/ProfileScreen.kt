@@ -1,5 +1,12 @@
 package com.example.recommend
 
+import android.net.Uri
+import android.os.Handler
+import android.os.Looper
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -27,6 +34,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -47,7 +55,11 @@ import com.example.recommend.ui.theme.GradientTop
 import com.example.recommend.ui.theme.SurfaceMuted
 import com.example.recommend.ui.theme.SurfacePastel
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.storage.FirebaseStorage
+import com.google.firebase.storage.StorageMetadata
 import java.util.Locale
+import java.util.concurrent.Executors
 
 private enum class ProfileSurface {
     PERSONAL,
@@ -62,6 +74,8 @@ fun ProfileScreen(
     myOffers: List<AdOffer> = emptyList(),
     followersCount: Int = 0,
     participatingPromoCampaignsCount: Int = 0,
+    profileSurfaceOrdinal: Int = 0,
+    onProfileSurfaceChange: (Int) -> Unit = {},
     onCollectionClick: (PostCollection) -> Unit = {},
     onPostClick: (String) -> Unit = {},
     onCreateCampaign: () -> Unit = {},
@@ -70,7 +84,72 @@ fun ProfileScreen(
     onLogout: () -> Unit
 ) {
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
-    var profileSurfaceOrdinal by rememberSaveable { mutableIntStateOf(0) }
+    var isAvatarUploading by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val db = FirebaseFirestore.getInstance()
+    val storage = FirebaseStorage.getInstance()
+    val compressExecutor = remember { Executors.newSingleThreadExecutor() }
+    val mainHandler = remember { Handler(Looper.getMainLooper()) }
+
+    val pickAvatar = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val uid = userProfile.uid
+        if (uid.isBlank()) return@rememberLauncherForActivityResult
+        isAvatarUploading = true
+        compressExecutor.execute {
+            val bytes = ImageCompress.compressUriToJpeg(
+                context,
+                uri,
+                ImageCompress.AVATAR_MAX_SIDE_PX,
+                ImageCompress.AVATAR_JPEG_QUALITY
+            )
+            if (bytes == null || bytes.isEmpty()) {
+                mainHandler.post {
+                    isAvatarUploading = false
+                    Toast.makeText(context, "Could not process image", Toast.LENGTH_SHORT).show()
+                }
+                return@execute
+            }
+            val ref = storage.reference.child("avatars/$uid/avatar.jpg")
+            val metadata = StorageMetadata.Builder().setContentType("image/jpeg").build()
+            ref.putBytes(bytes, metadata)
+                .addOnSuccessListener {
+                    ref.downloadUrl
+                        .addOnSuccessListener { downloadUri ->
+                            db.trustListDataRoot()
+                                .collection("users").document(uid)
+                                .update("avatar", downloadUri.toString())
+                                .addOnSuccessListener {
+                                    mainHandler.post {
+                                        isAvatarUploading = false
+                                        Toast.makeText(context, "Photo updated", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                                .addOnFailureListener { e ->
+                                    mainHandler.post {
+                                        isAvatarUploading = false
+                                        Toast.makeText(context, "Save failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                        }
+                        .addOnFailureListener { e ->
+                            mainHandler.post {
+                                isAvatarUploading = false
+                                Toast.makeText(context, "URL failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                }
+                .addOnFailureListener { e ->
+                    mainHandler.post {
+                        isAvatarUploading = false
+                        Toast.makeText(context, "Upload failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                    }
+                }
+        }
+    }
+
     val profileSurface = if (profileSurfaceOrdinal == 0) ProfileSurface.PERSONAL else ProfileSurface.ADS_CAMPAIGNS
 
     LazyColumn(
@@ -95,17 +174,48 @@ fun ProfileScreen(
                         .fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    AsyncImage(
-                        model = userProfile.avatar.ifEmpty { "https://api.dicebear.com/7.x/avataaars/svg?seed=${userProfile.uid}" },
-                        contentDescription = "Avatar",
+                    Box(
                         modifier = Modifier
                             .size(100.dp)
                             .clip(CircleShape)
-                            .background(SurfaceMuted),
-                        contentScale = ContentScale.Crop
+                            .background(SurfaceMuted)
+                            .clickable(enabled = !isAvatarUploading) {
+                                pickAvatar.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                )
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        AsyncImage(
+                            model = userProfile.avatar.ifEmpty { "https://api.dicebear.com/7.x/avataaars/svg?seed=${userProfile.uid}" },
+                            contentDescription = "Avatar",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                        if (isAvatarUploading) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(Color.Black.copy(alpha = 0.35f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(36.dp),
+                                    color = RichPastelCoral,
+                                    strokeWidth = 2.dp
+                                )
+                            }
+                        }
+                    }
+                    Text(
+                        "Tap photo to change",
+                        style = AppTextStyles.BodySmall,
+                        color = DarkPastelAnthracite.copy(alpha = 0.45f),
+                        fontSize = 11.sp,
+                        modifier = Modifier.padding(top = 6.dp)
                     )
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     Text(userProfile.name, style = AppTextStyles.Heading2.copy(fontSize = 24.sp))
                     Text(userProfile.handle, color = RichPastelCoral, style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Medium)
@@ -178,7 +288,7 @@ fun ProfileScreen(
 
                             Spacer(modifier = Modifier.height(20.dp))
                             OutlinedButton(
-                                onClick = { profileSurfaceOrdinal = 1 },
+                                onClick = { onProfileSurfaceChange(1) },
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(50.dp),
@@ -186,9 +296,9 @@ fun ProfileScreen(
                                 border = BorderStroke(1.dp, MutedPastelTeal),
                                 colors = ButtonDefaults.outlinedButtonColors(contentColor = MutedPastelTeal)
                             ) {
-                                Text("Go to Ads Campaigns", style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold)
+                                Text("Go to Ads Campaigns", style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold, color = MutedPastelTeal)
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, modifier = Modifier.size(20.dp))
+                                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = MutedPastelTeal, modifier = Modifier.size(20.dp))
                             }
                         }
 
@@ -262,7 +372,7 @@ fun ProfileScreen(
 
                             Spacer(modifier = Modifier.height(20.dp))
                             OutlinedButton(
-                                onClick = { profileSurfaceOrdinal = 0 },
+                                onClick = { onProfileSurfaceChange(0) },
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(50.dp),
@@ -270,9 +380,9 @@ fun ProfileScreen(
                                 border = BorderStroke(1.dp, RichPastelCoral),
                                 colors = ButtonDefaults.outlinedButtonColors(contentColor = RichPastelCoral)
                             ) {
-                                Icon(Icons.Filled.Person, contentDescription = null, modifier = Modifier.size(20.dp))
+                                Icon(Icons.Filled.Person, contentDescription = null, tint = RichPastelCoral, modifier = Modifier.size(20.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Personal cabinet", style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold)
+                                Text("Personal cabinet", style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold, color = RichPastelCoral)
                             }
                         }
                     }
@@ -293,9 +403,9 @@ fun ProfileScreen(
                             .height(50.dp),
                         shape = RoundedCornerShape(16.dp)
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null)
+                        Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null, tint = RichPastelCoral)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Log out", style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text("Log out", style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = RichPastelCoral)
                     }
                 }
             }
@@ -360,9 +470,9 @@ private fun LazyListScope.adsDashboardSection(
                 border = BorderStroke(1.dp, RichPastelCoral),
                 colors = ButtonDefaults.outlinedButtonColors(contentColor = RichPastelCoral)
             ) {
-                Icon(Icons.Filled.Campaign, contentDescription = null, modifier = Modifier.size(20.dp))
+                Icon(Icons.Filled.Campaign, contentDescription = null, tint = RichPastelCoral, modifier = Modifier.size(20.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("New campaign", style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold)
+                Text("New campaign", style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold, color = RichPastelCoral)
             }
             Spacer(modifier = Modifier.height(24.dp))
         } else {

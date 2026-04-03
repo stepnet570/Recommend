@@ -8,6 +8,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -34,6 +35,8 @@ fun MainAppScreen(onLogout: () -> Unit) {
     var currentUserProfile by remember { mutableStateOf<UserProfile?>(null) }
     var userCollections by remember { mutableStateOf<List<PostCollection>>(emptyList()) }
     var myOffers by remember { mutableStateOf<List<AdOffer>>(emptyList()) }
+    /** Active B2B offers for the feed carousel (all businesses). */
+    var feedActiveOffers by remember { mutableStateOf<List<AdOffer>>(emptyList()) }
     var followersCount by remember { mutableStateOf(0) }
     var participatingPromoCampaignsCount by remember { mutableStateOf(0) }
     var isLoading by remember { mutableStateOf(true) }
@@ -47,6 +50,8 @@ fun MainAppScreen(onLogout: () -> Unit) {
     var openPostId by remember { mutableStateOf<String?>(null) }
     var createCampaignOverlay by remember { mutableStateOf(false) }
     var selectedOfferId by remember { mutableStateOf<String?>(null) }
+    /** 0 = personal cabinet, 1 = ads campaigns; lives in MainApp so it survives tab switches */
+    var profileSurfaceOrdinal by rememberSaveable { mutableIntStateOf(0) }
 
     val db = FirebaseFirestore.getInstance()
     val auth = FirebaseAuth.getInstance()
@@ -184,6 +189,19 @@ fun MainAppScreen(onLogout: () -> Unit) {
                 }
             }
 
+        // Public feed: all active offers (B2B strip on Feed)
+        db.trustListDataRoot()
+            .collection("offers")
+            .whereEqualTo("status", "active")
+            .addSnapshotListener { snapshot, _ ->
+                if (snapshot != null) {
+                    feedActiveOffers = snapshot.documents
+                        .mapNotNull { it.toAdOfferOrNull() }
+                        .filter { it.status.equals("active", ignoreCase = true) }
+                        .sortedByDescending { it.createdAt }
+                }
+            }
+
         // Users who follow this account (their user doc has "following" containing our uid)
         db.trustListDataRoot()
             .collection("users")
@@ -209,13 +227,21 @@ fun MainAppScreen(onLogout: () -> Unit) {
         userCollections.flatMap { it.postIds }.toSet()
     }
 
+    /** Home feed: show other businesses' active offers only, not your own campaigns. */
+    val feedOffersForHome = remember(feedActiveOffers, currentUser?.uid) {
+        val uid = currentUser?.uid
+        if (uid.isNullOrBlank()) feedActiveOffers
+        else feedActiveOffers.filter { it.businessId != uid }
+    }
+
     LaunchedEffect(currentTab) {
         if (currentTab != "add") businessAddDestination = BusinessAddDestination.Hub
     }
 
-    LaunchedEffect(myOffers, selectedOfferId) {
+    LaunchedEffect(myOffers, feedActiveOffers, selectedOfferId) {
         val id = selectedOfferId ?: return@LaunchedEffect
-        if (myOffers.none { it.id == id }) selectedOfferId = null
+        val known = myOffers.any { it.id == id } || feedActiveOffers.any { it.id == id }
+        if (!known) selectedOfferId = null
     }
 
     fun ratePost(postId: String, stars: Int) {
@@ -227,6 +253,8 @@ fun MainAppScreen(onLogout: () -> Unit) {
     }
 
     fun toggleOfferPause(offer: AdOffer) {
+        val uid = currentUser?.uid ?: return
+        if (offer.businessId != uid) return
         val next = if (offer.status.equals("active", ignoreCase = true)) "paused" else "active"
         db.trustListDataRoot()
             .collection("offers")
@@ -297,8 +325,13 @@ fun MainAppScreen(onLogout: () -> Unit) {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = RichPastelCoral) }
                     } else {
                         FeedScreen(
-                            posts = realPosts, requests = feedRequests, users = allUsers,
+                            posts = realPosts,
+                            requests = feedRequests,
+                            users = allUsers,
+                            followingUserIds = currentUserProfile?.following?.toSet() ?: emptySet(),
                             savedPostIds = savedPostIds,
+                            activeOffers = feedOffersForHome,
+                            onOfferAccept = { offer -> selectedOfferId = offer.id },
                             onAskPackClick = { isAskModalOpen = true },
                             onRequestClick = { selectedRequest -> activeRequest = selectedRequest },
                             onSaveClick = { postToSave = it },
@@ -352,6 +385,8 @@ fun MainAppScreen(onLogout: () -> Unit) {
                             myOffers = myOffers,
                             followersCount = followersCount,
                             participatingPromoCampaignsCount = participatingPromoCampaignsCount,
+                            profileSurfaceOrdinal = profileSurfaceOrdinal,
+                            onProfileSurfaceChange = { profileSurfaceOrdinal = it.coerceIn(0, 1) },
                             onCollectionClick = { activeCollection = it },
                             onPostClick = { openPostId = it },
                             onCreateCampaign = { createCampaignOverlay = true },
@@ -438,13 +473,16 @@ fun MainAppScreen(onLogout: () -> Unit) {
         }
     }
 
-    val offerForDetail = selectedOfferId?.let { id -> myOffers.find { it.id == id } }
+    val offerForDetail = selectedOfferId?.let { id ->
+        myOffers.find { it.id == id } ?: feedActiveOffers.find { it.id == id }
+    }
     if (offerForDetail != null) {
         Surface(modifier = Modifier.fillMaxSize(), color = Color.White) {
             BusinessOfferDetailScreen(
                 offer = offerForDetail,
                 onBack = { selectedOfferId = null },
-                onPauseToggle = { toggleOfferPause(it) }
+                onPauseToggle = { toggleOfferPause(it) },
+                canManageCampaign = offerForDetail.businessId == currentUser?.uid
             )
         }
     }

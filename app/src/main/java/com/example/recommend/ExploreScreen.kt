@@ -165,7 +165,12 @@ fun ExploreScreen(onUserProfileClick: (String) -> Unit = {}) {
                                 shape = RoundedCornerShape(12.dp),
                                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
                             ) {
-                                Text(if (isFollowing) "Unfollow" else "Follow", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                Text(
+                                    if (isFollowing) "Unfollow" else "Follow",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp,
+                                    color = if (isFollowing) DarkPastelAnthracite else scheme.onPrimary
+                                )
                             }
                         }
                     }

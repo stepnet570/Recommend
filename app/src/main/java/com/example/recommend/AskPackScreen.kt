@@ -180,14 +180,14 @@ fun AskPackScreen(
                                                 Box(
                                                     modifier = Modifier
                                                         .clip(RoundedCornerShape(32.dp))
-                                                        .background(if (isSelected) MutedPastelTeal else Color.White)
+                                                        .background(if (isSelected) scheme.primary else Color.White)
                                                         .border(1.dp, if (isSelected) Color.Transparent else SurfaceMuted, RoundedCornerShape(32.dp))
                                                         .clickable { selectedTags = if (isSelected) selectedTags - tag else selectedTags + tag }
                                                         .padding(horizontal = 16.dp, vertical = 10.dp)
                                                 ) {
                                                     Text(
                                                         tag,
-                                                        color = if (isSelected) Color.White else DarkPastelAnthracite,
+                                                        color = if (isSelected) scheme.onPrimary else DarkPastelAnthracite,
                                                         fontWeight = FontWeight.Bold,
                                                         fontSize = 13.sp
                                                     )
@@ -218,9 +218,9 @@ fun AskPackScreen(
                                 shape = RoundedCornerShape(32.dp),
                                 colors = ButtonDefaults.buttonColors(containerColor = scheme.primary, contentColor = scheme.onPrimary)
                             ) {
-                                Text("Next", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                Text("Next", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = scheme.onPrimary)
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = Color.White)
+                                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = scheme.onPrimary)
                             }
                         }
                     }
@@ -304,7 +304,7 @@ fun AskPackScreen(
                                 if (isSubmitting) {
                                     CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
                                 } else {
-                                    Text("Send signal", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                                    Text("Send signal", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = scheme.onPrimary)
                                 }
                             }
                         }

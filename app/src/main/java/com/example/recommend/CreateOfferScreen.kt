@@ -299,7 +299,8 @@ fun CreateOfferScreen(
                                 "Launch campaign",
                                 style = AppTextStyles.BodyMedium,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp
+                                fontSize = 16.sp,
+                                color = scheme.onPrimary
                             )
                         }
                     }

@@ -311,7 +311,8 @@ fun PublicUserProfileScreen(
                                     Text(
                                         if (isFollowing) "Unfollow" else "Follow",
                                         fontWeight = FontWeight.Bold,
-                                        fontSize = 15.sp
+                                        fontSize = 15.sp,
+                                        color = if (isFollowing) DarkPastelAnthracite else scheme.onPrimary
                                     )
                                 }
                             }

@@ -25,8 +25,14 @@ fun CollectionDetailScreen(
     collection: PostCollection,
     posts: List<Post>,
     savedPostIds: Set<String> = emptySet(),
+    users: List<UserProfile> = emptyList(),
     onBack: () -> Unit,
-    onSaveClick: (String) -> Unit
+    onSaveClick: (String) -> Unit,
+    onUserProfileClick: (String) -> Unit = {},
+    viewerUid: String? = null,
+    onAudienceRate: (String, Int) -> Unit = { _, _ -> },
+    onOpenPost: ((String) -> Unit)? = null,
+    onLikeToggle: (String) -> Unit = {}
 ) {
     BackHandler {
         onBack()
@@ -68,7 +74,13 @@ fun CollectionDetailScreen(
                     PostCard(
                         post = post,
                         isSaved = savedPostIds.contains(post.id),
-                        onSaveClick = onSaveClick
+                        onSaveClick = onSaveClick,
+                        users = users,
+                        onUserProfileClick = onUserProfileClick,
+                        viewerUid = viewerUid,
+                        onAudienceRate = onAudienceRate,
+                        onOpenPost = onOpenPost,
+                        onLikeToggle = onLikeToggle
                     )
                 }
             }

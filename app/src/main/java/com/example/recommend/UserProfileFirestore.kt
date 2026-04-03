@@ -2,6 +2,7 @@ package com.example.recommend
 
 import android.util.Log
 import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 
@@ -74,26 +75,73 @@ fun buildUserProfileMapFromFirebaseUser(user: FirebaseUser): HashMap<String, Any
 }
 
 /**
- * Ensures `artifacts/.../users/{uid}` exists. Google users often get a doc from backend/another client;
- * email/password users may miss it if the first client write fails — this fixes that on first app open.
+ * Fills only missing or invalid fields so legacy accounts (created before schema changes) get defaults
+ * without overwriting name, avatar, etc. when already set.
+ */
+internal fun legacyUserProfilePatches(snap: DocumentSnapshot, user: FirebaseUser): HashMap<String, Any> {
+    val defaults = buildUserProfileMapFromFirebaseUser(user)
+    val patches = HashMap<String, Any>()
+
+    if (snap.getString("uid").isNullOrBlank()) patches["uid"] = user.uid
+    if (snap.getString("name").isNullOrBlank()) patches["name"] = defaults["name"]!!
+    if (snap.getString("handle").isNullOrBlank()) patches["handle"] = defaults["handle"]!!
+    if (snap.getString("bio").isNullOrBlank()) patches["bio"] = defaults["bio"]!!
+    if (snap.getString("avatar").isNullOrBlank()) patches["avatar"] = defaults["avatar"]!!
+    if (snap.getString("email").isNullOrBlank()) {
+        patches["email"] = defaults["email"] as? String ?: ""
+    }
+
+    when (snap.get("following")) {
+        is List<*> -> { /* ok */ }
+        else -> patches["following"] = emptyList<String>()
+    }
+
+    when (snap.get("trustScore")) {
+        null -> patches["trustScore"] = 0.0
+        !is Number -> patches["trustScore"] = 0.0
+    }
+    when (snap.get("trustCoins")) {
+        null -> patches["trustCoins"] = 0
+        !is Number -> patches["trustCoins"] = 0
+    }
+    if (snap.get("isBusiness") == null) patches["isBusiness"] = false
+    if (snap.get("createdAt") == null) patches["createdAt"] = System.currentTimeMillis()
+
+    return patches
+}
+
+/**
+ * Ensures `artifacts/.../users/{uid}` exists and has a complete schema.
+ * - Missing document: create from [FirebaseUser].
+ * - Existing document: merge any missing/invalid fields (legacy users before schema updates).
  */
 fun FirebaseFirestore.ensureUserProfileForAuthUser(user: FirebaseUser, onDone: () -> Unit) {
     val docRef = trustListDataRoot().collection("users").document(user.uid)
     docRef.get()
         .addOnSuccessListener { snap ->
-            if (snap.exists()) {
-                onDone()
-                return@addOnSuccessListener
-            }
             user.getIdToken(true)
                 .addOnSuccessListener {
-                    val map = buildUserProfileMapFromFirebaseUser(user)
-                    docRef.set(map, SetOptions.merge())
-                        .addOnSuccessListener { onDone() }
-                        .addOnFailureListener { e ->
-                            Log.e(TAG, "ensureUserProfile set failed uid=${user.uid}", e)
+                    if (!snap.exists()) {
+                        val map = buildUserProfileMapFromFirebaseUser(user)
+                        docRef.set(map, SetOptions.merge())
+                            .addOnSuccessListener { onDone() }
+                            .addOnFailureListener { e ->
+                                Log.e(TAG, "ensureUserProfile set failed uid=${user.uid}", e)
+                                onDone()
+                            }
+                    } else {
+                        val patches = legacyUserProfilePatches(snap, user)
+                        if (patches.isEmpty()) {
                             onDone()
+                        } else {
+                            docRef.set(patches, SetOptions.merge())
+                                .addOnSuccessListener { onDone() }
+                                .addOnFailureListener { e ->
+                                    Log.e(TAG, "ensureUserProfile merge legacy failed uid=${user.uid}", e)
+                                    onDone()
+                                }
                         }
+                    }
                 }
                 .addOnFailureListener { e ->
                     Log.e(TAG, "ensureUserProfile getIdToken failed uid=${user.uid}", e)

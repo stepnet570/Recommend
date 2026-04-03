@@ -123,7 +123,7 @@ fun SaveCollectionDialog(
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = scheme.primary, contentColor = scheme.onPrimary)
                     ) {
-                        Text("Create", fontWeight = FontWeight.SemiBold)
+                        Text("Create", fontWeight = FontWeight.SemiBold, color = scheme.onPrimary)
                     }
                 }
 
@@ -195,7 +195,7 @@ fun SaveCollectionDialog(
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = scheme.primary, contentColor = scheme.onPrimary)
                     ) {
-                        Text("Done", fontWeight = FontWeight.Bold)
+                        Text("Done", fontWeight = FontWeight.Bold, color = scheme.onPrimary)
                     }
                 }
                 if (!postSavedInAnyCollection) {

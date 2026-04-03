@@ -8,6 +8,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -17,6 +18,7 @@ import com.example.recommend.ui.theme.MutedPastelTeal
 import com.example.recommend.ui.theme.SurfaceMuted
 import com.example.recommend.ui.theme.SurfacePastel
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 
@@ -33,6 +35,10 @@ fun MainAppScreen(onLogout: () -> Unit) {
     var currentUserProfile by remember { mutableStateOf<UserProfile?>(null) }
     var userCollections by remember { mutableStateOf<List<PostCollection>>(emptyList()) }
     var myOffers by remember { mutableStateOf<List<AdOffer>>(emptyList()) }
+    /** Active B2B offers for the feed carousel (all businesses). */
+    var feedActiveOffers by remember { mutableStateOf<List<AdOffer>>(emptyList()) }
+    var followersCount by remember { mutableStateOf(0) }
+    var participatingPromoCampaignsCount by remember { mutableStateOf(0) }
     var isLoading by remember { mutableStateOf(true) }
 
     var isAskModalOpen by remember { mutableStateOf(false) }
@@ -40,6 +46,12 @@ fun MainAppScreen(onLogout: () -> Unit) {
     var postToSave by remember { mutableStateOf<String?>(null) }
     var activeCollection by remember { mutableStateOf<PostCollection?>(null) }
     var businessAddDestination by remember { mutableStateOf(BusinessAddDestination.Hub) }
+    var viewUserProfileId by remember { mutableStateOf<String?>(null) }
+    var openPostId by remember { mutableStateOf<String?>(null) }
+    var createCampaignOverlay by remember { mutableStateOf(false) }
+    var selectedOfferId by remember { mutableStateOf<String?>(null) }
+    /** 0 = personal cabinet, 1 = ads campaigns; lives in MainApp so it survives tab switches */
+    var profileSurfaceOrdinal by rememberSaveable { mutableIntStateOf(0) }
 
     val db = FirebaseFirestore.getInstance()
     val auth = FirebaseAuth.getInstance()
@@ -59,13 +71,41 @@ fun MainAppScreen(onLogout: () -> Unit) {
             .addSnapshotListener { snapshot, _ ->
                 if (snapshot != null) {
                     realPosts = snapshot.documents.mapNotNull { doc ->
+                        val ratingsRaw = doc.get("ratings")
+                        val ratingsByUser: Map<String, Int> = when (ratingsRaw) {
+                            is Map<*, *> -> ratingsRaw.mapNotNull { (k, v) ->
+                                val key = k as? String ?: return@mapNotNull null
+                                val intVal = when (v) {
+                                    is Long -> v.toInt()
+                                    is Int -> v
+                                    else -> null
+                                } ?: return@mapNotNull null
+                                key to intVal.coerceIn(1, 5)
+                            }.toMap()
+                            else -> emptyMap()
+                        }
+                        val likesRaw = doc.get("likes")
+                        val likesByUser: Set<String> = when (likesRaw) {
+                            is Map<*, *> -> likesRaw.mapNotNull { (k, v) ->
+                                val key = k as? String ?: return@mapNotNull null
+                                val on = when (v) {
+                                    is Boolean -> v
+                                    is Number -> v.toLong() != 0L
+                                    else -> v != null
+                                }
+                                if (on) key else null
+                            }.toSet()
+                            else -> emptySet()
+                        }
                         Post(
                             id = doc.id, userId = doc.getString("userId") ?: "", title = doc.getString("title") ?: "",
                             description = doc.getString("description") ?: "", category = doc.getString("category") ?: "Food",
                             location = doc.getString("location") ?: "", rating = doc.getLong("rating")?.toInt() ?: 5,
                             imageUrl = doc.getString("imageUrl"), authorName = doc.getString("authorName") ?: "User",
                             authorHandle = doc.getString("authorHandle") ?: "@user",
-                            isSponsored = doc.getBoolean("sponsored") == true
+                            isSponsored = doc.getBoolean("sponsored") == true,
+                            ratingsByUser = ratingsByUser,
+                            likesByUser = likesByUser
                         )
                     }
                     isLoading = false
@@ -137,7 +177,7 @@ fun MainAppScreen(onLogout: () -> Unit) {
                 }
             }
 
-        // Business ad offers (campaigns)
+        // Business ad offers (campaigns you launched)
         db.trustListDataRoot()
             .collection("offers")
             .whereEqualTo("businessId", currentUser.uid)
@@ -147,6 +187,35 @@ fun MainAppScreen(onLogout: () -> Unit) {
                         .mapNotNull { it.toAdOfferOrNull() }
                         .sortedByDescending { it.createdAt }
                 }
+            }
+
+        // Public feed: all active offers (B2B strip on Feed)
+        db.trustListDataRoot()
+            .collection("offers")
+            .whereEqualTo("status", "active")
+            .addSnapshotListener { snapshot, _ ->
+                if (snapshot != null) {
+                    feedActiveOffers = snapshot.documents
+                        .mapNotNull { it.toAdOfferOrNull() }
+                        .filter { it.status.equals("active", ignoreCase = true) }
+                        .sortedByDescending { it.createdAt }
+                }
+            }
+
+        // Users who follow this account (their user doc has "following" containing our uid)
+        db.trustListDataRoot()
+            .collection("users")
+            .whereArrayContains("following", currentUser.uid)
+            .addSnapshotListener { snapshot, _ ->
+                followersCount = snapshot?.size() ?: 0
+            }
+
+        // Offers where we participate as promoter (advertiser role for another brand)
+        db.trustListDataRoot()
+            .collection("offers")
+            .whereArrayContains("promoterUserIds", currentUser.uid)
+            .addSnapshotListener { snapshot, _ ->
+                participatingPromoCampaignsCount = snapshot?.size() ?: 0
             }
     }
 
@@ -158,10 +227,53 @@ fun MainAppScreen(onLogout: () -> Unit) {
         userCollections.flatMap { it.postIds }.toSet()
     }
 
+    /** Home feed: show other businesses' active offers only, not your own campaigns. */
+    val feedOffersForHome = remember(feedActiveOffers, currentUser?.uid) {
+        val uid = currentUser?.uid
+        if (uid.isNullOrBlank()) feedActiveOffers
+        else feedActiveOffers.filter { it.businessId != uid }
+    }
+
     LaunchedEffect(currentTab) {
         if (currentTab != "add") businessAddDestination = BusinessAddDestination.Hub
     }
 
+    LaunchedEffect(myOffers, feedActiveOffers, selectedOfferId) {
+        val id = selectedOfferId ?: return@LaunchedEffect
+        val known = myOffers.any { it.id == id } || feedActiveOffers.any { it.id == id }
+        if (!known) selectedOfferId = null
+    }
+
+    fun ratePost(postId: String, stars: Int) {
+        val uid = currentUser?.uid ?: return
+        db.trustListDataRoot()
+            .collection("posts")
+            .document(postId)
+            .update("ratings.$uid", stars.coerceIn(1, 5))
+    }
+
+    fun toggleOfferPause(offer: AdOffer) {
+        val uid = currentUser?.uid ?: return
+        if (offer.businessId != uid) return
+        val next = if (offer.status.equals("active", ignoreCase = true)) "paused" else "active"
+        db.trustListDataRoot()
+            .collection("offers")
+            .document(offer.id)
+            .update("status", next)
+    }
+
+    fun toggleLike(postId: String) {
+        val uid = currentUser?.uid ?: return
+        val post = realPosts.find { it.id == postId } ?: return
+        val ref = db.trustListDataRoot().collection("posts").document(postId)
+        if (post.likesByUser.contains(uid)) {
+            ref.update("likes.$uid", FieldValue.delete())
+        } else {
+            ref.update("likes.$uid", true)
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
         containerColor = Color.Transparent,
         bottomBar = {
@@ -213,15 +325,26 @@ fun MainAppScreen(onLogout: () -> Unit) {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = RichPastelCoral) }
                     } else {
                         FeedScreen(
-                            posts = realPosts, requests = feedRequests, users = allUsers,
+                            posts = realPosts,
+                            requests = feedRequests,
+                            users = allUsers,
+                            followingUserIds = currentUserProfile?.following?.toSet() ?: emptySet(),
                             savedPostIds = savedPostIds,
+                            activeOffers = feedOffersForHome,
+                            onOfferAccept = { offer -> selectedOfferId = offer.id },
                             onAskPackClick = { isAskModalOpen = true },
                             onRequestClick = { selectedRequest -> activeRequest = selectedRequest },
-                            onSaveClick = { postToSave = it }
+                            onSaveClick = { postToSave = it },
+                            onUserProfileClick = { viewUserProfileId = it },
+                            onRequestAuthorProfileClick = { viewUserProfileId = it },
+                            viewerUid = currentUser?.uid,
+                            onAudienceRate = { postId, stars -> ratePost(postId, stars) },
+                            onOpenPost = { openPostId = it },
+                            onLikeToggle = { toggleLike(it) }
                         )
                     }
                 }
-                "explore" -> ExploreScreen()
+                "explore" -> ExploreScreen(onUserProfileClick = { viewUserProfileId = it })
                 "add" -> {
                     if (currentUserProfile?.isBusiness == true) {
                         when (businessAddDestination) {
@@ -260,7 +383,15 @@ fun MainAppScreen(onLogout: () -> Unit) {
                             myPosts = myPosts,
                             collections = userCollections,
                             myOffers = myOffers,
+                            followersCount = followersCount,
+                            participatingPromoCampaignsCount = participatingPromoCampaignsCount,
+                            profileSurfaceOrdinal = profileSurfaceOrdinal,
+                            onProfileSurfaceChange = { profileSurfaceOrdinal = it.coerceIn(0, 1) },
                             onCollectionClick = { activeCollection = it },
+                            onPostClick = { openPostId = it },
+                            onCreateCampaign = { createCampaignOverlay = true },
+                            onOfferClick = { selectedOfferId = it.id },
+                            onOfferPauseToggle = { toggleOfferPause(it) },
                             onLogout = onLogout
                         )
                     } else {
@@ -283,7 +414,8 @@ fun MainAppScreen(onLogout: () -> Unit) {
             request = activeRequest!!,
             answers = requestAnswers,
             users = allUsers,
-            onBack = { activeRequest = null }
+            onBack = { activeRequest = null },
+            onUserProfileClick = { viewUserProfileId = it }
         )
     }
 
@@ -297,8 +429,73 @@ fun MainAppScreen(onLogout: () -> Unit) {
             collection = activeCollection!!,
             posts = collectionPosts,
             savedPostIds = savedPostIds,
+            users = allUsers,
             onBack = { activeCollection = null },
-            onSaveClick = { postToSave = it }
+            onSaveClick = { postToSave = it },
+            onUserProfileClick = { viewUserProfileId = it },
+            viewerUid = currentUser?.uid,
+            onAudienceRate = { postId, stars -> ratePost(postId, stars) },
+            onOpenPost = { openPostId = it },
+            onLikeToggle = { toggleLike(it) }
         )
+    }
+
+    if (viewUserProfileId != null && currentUser != null) {
+        Surface(modifier = Modifier.fillMaxSize(), color = Color.White) {
+            PublicUserProfileScreen(
+                userId = viewUserProfileId!!,
+                viewerUid = currentUser.uid,
+                viewerProfile = currentUserProfile,
+                allUsers = allUsers,
+                userPosts = realPosts.filter { it.userId == viewUserProfileId },
+                onBack = { viewUserProfileId = null },
+                onPostClick = { openPostId = it }
+            )
+        }
+    }
+
+    if (openPostId != null && currentUser != null) {
+        val detailPost = realPosts.find { it.id == openPostId }
+        if (detailPost != null) {
+            Surface(modifier = Modifier.fillMaxSize(), color = Color.White) {
+                PostDetailScreen(
+                    post = detailPost,
+                    users = allUsers,
+                    savedPostIds = savedPostIds,
+                    viewerUid = currentUser.uid,
+                    onBack = { openPostId = null },
+                    onSaveClick = { postToSave = it },
+                    onUserProfileClick = { viewUserProfileId = it },
+                    onAudienceRate = { postId, stars -> ratePost(postId, stars) },
+                    onLikeToggle = { toggleLike(it) }
+                )
+            }
+        }
+    }
+
+    val offerForDetail = selectedOfferId?.let { id ->
+        myOffers.find { it.id == id } ?: feedActiveOffers.find { it.id == id }
+    }
+    if (offerForDetail != null) {
+        Surface(modifier = Modifier.fillMaxSize(), color = Color.White) {
+            BusinessOfferDetailScreen(
+                offer = offerForDetail,
+                onBack = { selectedOfferId = null },
+                onPauseToggle = { toggleOfferPause(it) },
+                canManageCampaign = offerForDetail.businessId == currentUser?.uid
+            )
+        }
+    }
+
+    val businessProfileForCampaign = currentUserProfile?.takeIf { it.isBusiness }
+    if (createCampaignOverlay && businessProfileForCampaign != null) {
+        Surface(modifier = Modifier.fillMaxSize(), color = Color.White) {
+            CreateOfferScreen(
+                userProfile = businessProfileForCampaign,
+                onOfferCreated = { createCampaignOverlay = false },
+                onBack = { createCampaignOverlay = false }
+            )
+        }
+    }
     }
 }

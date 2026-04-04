@@ -1,6 +1,7 @@
 package com.example.recommend
 
 import android.content.Context
+import androidx.core.content.edit
 import android.util.Log
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.DocumentSnapshot
@@ -227,14 +228,14 @@ fun FirebaseFirestore.migrateAllUserProfilesIfNeeded(context: Context, onDone: (
         .addOnSuccessListener { snapshot ->
             val docs = snapshot.documents
             if (docs.isEmpty()) {
-                prefs.edit().putBoolean(key, true).apply()
+                prefs.edit { putBoolean(key, true) }
                 onDone()
                 return@addOnSuccessListener
             }
             val chunks = docs.chunked(400)
             fun commitChunk(index: Int) {
                 if (index >= chunks.size) {
-                    prefs.edit().putBoolean(key, true).apply()
+                    prefs.edit { putBoolean(key, true) }
                     Log.i(TAG, "migrateAllUserProfiles: completed for ${docs.size} documents")
                     onDone()
                     return

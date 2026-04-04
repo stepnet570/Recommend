@@ -21,8 +21,17 @@ import com.example.recommend.ui.theme.SurfaceMuted
 import com.example.recommend.ui.theme.SoftPastelMint
 import com.example.recommend.ui.theme.SurfacePastel
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
+
+private fun DocumentSnapshot.firestoreStringList(key: String): List<String> {
+    val raw = get(key) ?: return emptyList()
+    return when (raw) {
+        is List<*> -> raw.mapNotNull { it as? String }
+        else -> emptyList()
+    }
+}
 
 private enum class BusinessAddDestination { Hub, Campaign, Post }
 
@@ -94,8 +103,8 @@ fun MainAppScreen(onLogout: () -> Unit) {
                     allRequests = snapshot.documents.mapNotNull { doc ->
                         PackRequest(
                             id = doc.id, userId = doc.getString("userId") ?: "", text = doc.getString("text") ?: "",
-                            tags = (doc.get("tags") as? List<String>) ?: emptyList(), location = doc.getString("location") ?: "",
-                            selectedUsers = (doc.get("selectedUsers") as? List<String>) ?: emptyList(),
+                            tags = doc.firestoreStringList("tags"), location = doc.getString("location") ?: "",
+                            selectedUsers = doc.firestoreStringList("selectedUsers"),
                             status = doc.getString("status") ?: "active", createdAt = doc.getLong("createdAt") ?: 0L
                         )
                     }
@@ -129,7 +138,7 @@ fun MainAppScreen(onLogout: () -> Unit) {
                     userCollections = snapshot.documents.mapNotNull { doc ->
                         PostCollection(
                             id = doc.id, userId = doc.getString("userId") ?: "", name = doc.getString("name") ?: "",
-                            postIds = (doc.get("postIds") as? List<String>) ?: emptyList(), createdAt = doc.getLong("createdAt") ?: 0L
+                            postIds = doc.firestoreStringList("postIds"), createdAt = doc.getLong("createdAt") ?: 0L
                         )
                     }
                 }

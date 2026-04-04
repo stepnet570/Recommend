@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import androidx.core.graphics.scale
 import java.io.ByteArrayOutputStream
 import kotlin.math.max
 import kotlin.math.min
@@ -42,7 +43,7 @@ object ImageCompress {
             if (scale < 1f) {
                 val nw = max(1, (w * scale).roundToInt())
                 val nh = max(1, (h * scale).roundToInt())
-                val scaled = Bitmap.createScaledBitmap(original, nw, nh, true)
+                val scaled = original.scale(nw, nh, true)
                 original.recycle()
                 scaled
             } else {

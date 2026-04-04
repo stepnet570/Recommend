@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<lint>
+    <!-- Update dependencies on your own schedule; these flood the commit dialog -->
+    <issue id="GradleDependency" severity="ignore" />
+    <issue id="NewerVersionAvailable" severity="ignore" />
+    <issue id="AndroidGradlePluginVersion" severity="ignore" />
+    <issue id="UseTomlInstead" severity="ignore" />
+    <!-- targetSdk / compileSdk: bump after testing -->
+    <issue id="OldTargetApi" severity="ignore" />
+    <!-- Template icons; replace when you have final assets -->
+    <issue id="IconLauncherShape" severity="ignore" />
+    <issue id="IconDuplicates" severity="ignore" />
+    <issue id="MonochromeLauncherIcon" severity="ignore" />
+    <issue id="IconExtension" severity="ignore" />
+</lint>

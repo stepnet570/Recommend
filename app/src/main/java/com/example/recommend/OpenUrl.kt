@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.core.net.toUri
 
 /**
  * Opens HTTP(S) URLs. For Google Maps short links opens the **Maps app** first.
@@ -54,7 +55,7 @@ private fun normalizeHttpUrl(raw: String): Uri? {
         t.startsWith("http://", ignoreCase = true) || t.startsWith("https://", ignoreCase = true) -> t
         else -> "https://$t"
     }
-    return runCatching { Uri.parse(withScheme) }.getOrNull()
+    return runCatching { withScheme.toUri() }.getOrNull()
 }
 
 /** Removes `_nr` query param (Firebase / redirect noise). */
@@ -83,7 +84,7 @@ private fun rewriteMapsShortLinks(uri: Uri): Uri {
     if (!path.startsWith(prefix, ignoreCase = true)) return uri
     val code = path.removePrefix(prefix).trim('/')
     if (code.isEmpty()) return uri
-    return Uri.parse("https://maps.app.goo.gl/$code")
+    return "https://maps.app.goo.gl/$code".toUri()
 }
 
 private fun shouldPreferGoogleMaps(uri: Uri): Boolean {

@@ -2,6 +2,7 @@ package com.example.recommend
 
 import android.content.Intent
 import android.net.Uri
+import androidx.core.net.toUri
 import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -1185,7 +1186,7 @@ fun FeedPostCard(
 private fun PostLinkPreviewCard(url: String) {
     val trimmed = url.trim()
     if (trimmed.isEmpty()) return
-    val uri = remember(trimmed) { runCatching { Uri.parse(trimmed) }.getOrNull() }
+    val uri = remember(trimmed) { runCatching { trimmed.toUri() }.getOrNull() }
     val host = uri?.host.orEmpty()
     val faviconModel = remember(host) {
         if (host.isNotBlank()) "https://www.google.com/s2/favicons?sz=64&domain=$host" else null
@@ -1371,7 +1372,7 @@ fun PostCard(
                                     locCtx.startActivity(
                                         Intent(
                                             Intent.ACTION_VIEW,
-                                            Uri.parse("https://www.google.com/maps/search/?api=1&query=$q")
+                                            "https://www.google.com/maps/search/?api=1&query=$q".toUri()
                                         )
                                     )
                                 }

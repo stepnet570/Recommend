@@ -1,0 +1,137 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 420px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.percent {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: rgba(26, 31, 28, 0.55);
+  letter-spacing: 0.02em;
+}
+
+.buttons {
+  display: flex;
+  gap: 10px;
+  flex: 1;
+  justify-content: flex-end;
+  min-width: min(100%, 260px);
+}
+
+.btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 2px solid rgba(26, 31, 28, 0.18);
+  background: transparent;
+  color: rgba(26, 31, 28, 0.75);
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.15s ease;
+}
+
+.btn:hover:not(:disabled) {
+  border-color: rgba(26, 31, 28, 0.35);
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btnUpActive {
+  border-color: #2d8a5e;
+  background: #2d8a5e;
+  color: #fff;
+}
+
+.btnUpActive:hover:not(:disabled) {
+  background: #24734f;
+  border-color: #24734f;
+}
+
+.btnDownActive {
+  border-color: #c43d3d;
+  background: #c43d3d;
+  color: #fff;
+}
+
+.btnDownActive:hover:not(:disabled) {
+  background: #a83232;
+  border-color: #a83232;
+}
+
+.hint {
+  font-size: 0.75rem;
+  color: #c43d3d;
+  margin: 0;
+  min-height: 1.2em;
+}
+
+.chipsWrap {
+  overflow: hidden;
+  padding-top: 2px;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  border: 1.5px solid rgba(26, 31, 28, 0.2);
+  background: #fff;
+  color: rgba(26, 31, 28, 0.75);
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.15s ease;
+}
+
+.chip:hover {
+  border-color: rgba(196, 61, 61, 0.45);
+  background: rgba(196, 61, 61, 0.06);
+}
+
+.chipSelected {
+  border-color: #c43d3d;
+  background: rgba(196, 61, 61, 0.12);
+  color: #8f2a2a;
+}
+
+.icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}

@@ -11,14 +11,16 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.unit.dp
 import com.example.recommend.ui.theme.RichPastelCoral
 import com.example.recommend.ui.theme.MutedPastelTeal
 import com.example.recommend.ui.theme.SurfaceMuted
+import com.example.recommend.ui.theme.SoftPastelMint
 import com.example.recommend.ui.theme.SurfacePastel
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 
@@ -30,7 +32,6 @@ fun MainAppScreen(onLogout: () -> Unit) {
 
     var realPosts by remember { mutableStateOf<List<Post>>(emptyList()) }
     var allRequests by remember { mutableStateOf<List<PackRequest>>(emptyList()) }
-    var allAnswers by remember { mutableStateOf<List<Answer>>(emptyList()) }
     var allUsers by remember { mutableStateOf<List<UserProfile>>(emptyList()) }
     var currentUserProfile by remember { mutableStateOf<UserProfile?>(null) }
     var userCollections by remember { mutableStateOf<List<PostCollection>>(emptyList()) }
@@ -49,13 +50,20 @@ fun MainAppScreen(onLogout: () -> Unit) {
     var viewUserProfileId by remember { mutableStateOf<String?>(null) }
     var openPostId by remember { mutableStateOf<String?>(null) }
     var createCampaignOverlay by remember { mutableStateOf(false) }
+    /** When helping from PackSignals: bind new post to this request (main Add tab only). */
+    var linkedRequestIdForAdd by remember { mutableStateOf<String?>(null) }
+    /** Full-screen [AddPickScreen] for pack signal replies (not the main Add tab). */
+    var addPickForRequestId by remember { mutableStateOf<String?>(null) }
     var selectedOfferId by remember { mutableStateOf<String?>(null) }
+    /** Offer opened from another user's profile (not in myOffers / feedActiveOffers). */
+    var profileOfferCache by remember { mutableStateOf<AdOffer?>(null) }
     /** 0 = personal cabinet, 1 = ads campaigns; lives in MainApp so it survives tab switches */
     var profileSurfaceOrdinal by rememberSaveable { mutableIntStateOf(0) }
 
     val db = FirebaseFirestore.getInstance()
     val auth = FirebaseAuth.getInstance()
     val currentUser = auth.currentUser
+    val appContext = LocalContext.current.applicationContext
 
     LaunchedEffect(currentUser) {
         if (currentUser == null) return@LaunchedEffect
@@ -63,6 +71,8 @@ fun MainAppScreen(onLogout: () -> Unit) {
         // Email/password sign-up can miss the first Firestore write; Google users may get a doc from elsewhere.
         // This creates users/{uid} if missing so both flows match.
         db.ensureUserProfileForAuthUser(currentUser) { }
+        // One-time merge for legacy user docs missing fields (trustRatings, following shape, etc.).
+        db.migrateAllUserProfilesIfNeeded(appContext) { }
 
         // Posts
         db.trustListDataRoot()
@@ -70,44 +80,7 @@ fun MainAppScreen(onLogout: () -> Unit) {
             .orderBy("createdAt", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, _ ->
                 if (snapshot != null) {
-                    realPosts = snapshot.documents.mapNotNull { doc ->
-                        val ratingsRaw = doc.get("ratings")
-                        val ratingsByUser: Map<String, Int> = when (ratingsRaw) {
-                            is Map<*, *> -> ratingsRaw.mapNotNull { (k, v) ->
-                                val key = k as? String ?: return@mapNotNull null
-                                val intVal = when (v) {
-                                    is Long -> v.toInt()
-                                    is Int -> v
-                                    else -> null
-                                } ?: return@mapNotNull null
-                                key to intVal.coerceIn(1, 5)
-                            }.toMap()
-                            else -> emptyMap()
-                        }
-                        val likesRaw = doc.get("likes")
-                        val likesByUser: Set<String> = when (likesRaw) {
-                            is Map<*, *> -> likesRaw.mapNotNull { (k, v) ->
-                                val key = k as? String ?: return@mapNotNull null
-                                val on = when (v) {
-                                    is Boolean -> v
-                                    is Number -> v.toLong() != 0L
-                                    else -> v != null
-                                }
-                                if (on) key else null
-                            }.toSet()
-                            else -> emptySet()
-                        }
-                        Post(
-                            id = doc.id, userId = doc.getString("userId") ?: "", title = doc.getString("title") ?: "",
-                            description = doc.getString("description") ?: "", category = doc.getString("category") ?: "Food",
-                            location = doc.getString("location") ?: "", rating = doc.getLong("rating")?.toInt() ?: 5,
-                            imageUrl = doc.getString("imageUrl"), authorName = doc.getString("authorName") ?: "User",
-                            authorHandle = doc.getString("authorHandle") ?: "@user",
-                            isSponsored = doc.getBoolean("sponsored") == true,
-                            ratingsByUser = ratingsByUser,
-                            likesByUser = likesByUser
-                        )
-                    }
+                    realPosts = snapshot.documents.map { it.toPostFromDoc() }
                     isLoading = false
                 }
             }
@@ -124,21 +97,6 @@ fun MainAppScreen(onLogout: () -> Unit) {
                             tags = (doc.get("tags") as? List<String>) ?: emptyList(), location = doc.getString("location") ?: "",
                             selectedUsers = (doc.get("selectedUsers") as? List<String>) ?: emptyList(),
                             status = doc.getString("status") ?: "active", createdAt = doc.getLong("createdAt") ?: 0L
-                        )
-                    }
-                }
-            }
-
-        // Answers
-        db.trustListDataRoot()
-            .collection("answers")
-            .orderBy("createdAt", Query.Direction.ASCENDING)
-            .addSnapshotListener { snapshot, _ ->
-                if (snapshot != null) {
-                    allAnswers = snapshot.documents.mapNotNull { doc ->
-                        Answer(
-                            id = doc.id, requestId = doc.getString("requestId") ?: "", userId = doc.getString("userId") ?: "",
-                            text = doc.getString("text") ?: "", createdAt = doc.getLong("createdAt") ?: 0L
                         )
                     }
                 }
@@ -219,7 +177,20 @@ fun MainAppScreen(onLogout: () -> Unit) {
             }
     }
 
-    val feedRequests = allRequests.filter { it.userId == currentUser?.uid || it.selectedUsers.contains(currentUser?.uid) }
+    val feedRequests = remember(allRequests, realPosts, currentUser?.uid) {
+        val uid = currentUser?.uid
+        if (uid.isNullOrBlank()) emptyList()
+        else allRequests
+            .filter { it.userId == uid || it.selectedUsers.contains(uid) }
+            .map { req ->
+                req.copy(answersCount = realPosts.count { it.replyToRequestId == req.id })
+            }
+    }
+
+    /** Pack-signal replies (picks) live on the request detail / Add pick flow, not in the main feed. */
+    val feedPostsForHome = remember(realPosts) {
+        realPosts.filter { it.replyToRequestId.isNullOrBlank() }
+    }
 
     val myPosts = realPosts.filter { it.userId == currentUser?.uid }
 
@@ -238,10 +209,16 @@ fun MainAppScreen(onLogout: () -> Unit) {
         if (currentTab != "add") businessAddDestination = BusinessAddDestination.Hub
     }
 
-    LaunchedEffect(myOffers, feedActiveOffers, selectedOfferId) {
+    LaunchedEffect(myOffers, feedActiveOffers, profileOfferCache, selectedOfferId) {
         val id = selectedOfferId ?: return@LaunchedEffect
-        val known = myOffers.any { it.id == id } || feedActiveOffers.any { it.id == id }
+        val known = myOffers.any { it.id == id } ||
+            feedActiveOffers.any { it.id == id } ||
+            profileOfferCache?.id == id
         if (!known) selectedOfferId = null
+    }
+
+    LaunchedEffect(viewUserProfileId) {
+        if (viewUserProfileId == null) profileOfferCache = null
     }
 
     fun ratePost(postId: String, stars: Int) {
@@ -260,17 +237,6 @@ fun MainAppScreen(onLogout: () -> Unit) {
             .collection("offers")
             .document(offer.id)
             .update("status", next)
-    }
-
-    fun toggleLike(postId: String) {
-        val uid = currentUser?.uid ?: return
-        val post = realPosts.find { it.id == postId } ?: return
-        val ref = db.trustListDataRoot().collection("posts").document(postId)
-        if (post.likesByUser.contains(uid)) {
-            ref.update("likes.$uid", FieldValue.delete())
-        } else {
-            ref.update("likes.$uid", true)
-        }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -304,7 +270,10 @@ fun MainAppScreen(onLogout: () -> Unit) {
                         )
                     },
                     selected = currentTab == "add",
-                    onClick = { currentTab = "add" },
+                    onClick = {
+                        linkedRequestIdForAdd = null
+                        currentTab = "add"
+                    },
                     colors = NavigationBarItemDefaults.colors(indicatorColor = Color.Transparent)
                 )
                 NavigationBarItem(
@@ -325,22 +294,25 @@ fun MainAppScreen(onLogout: () -> Unit) {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = RichPastelCoral) }
                     } else {
                         FeedScreen(
-                            posts = realPosts,
+                            posts = feedPostsForHome,
                             requests = feedRequests,
                             users = allUsers,
                             followingUserIds = currentUserProfile?.following?.toSet() ?: emptySet(),
                             savedPostIds = savedPostIds,
                             activeOffers = feedOffersForHome,
+                            trustCoins = currentUserProfile?.trustCoins ?: 0,
                             onOfferAccept = { offer -> selectedOfferId = offer.id },
                             onAskPackClick = { isAskModalOpen = true },
                             onRequestClick = { selectedRequest -> activeRequest = selectedRequest },
+                            onSignalRequestOpen = { activeRequest = it },
+                            onHelpRequest = { req -> addPickForRequestId = req.id },
                             onSaveClick = { postToSave = it },
                             onUserProfileClick = { viewUserProfileId = it },
                             onRequestAuthorProfileClick = { viewUserProfileId = it },
                             viewerUid = currentUser?.uid,
                             onAudienceRate = { postId, stars -> ratePost(postId, stars) },
                             onOpenPost = { openPostId = it },
-                            onLikeToggle = { toggleLike(it) }
+                            onWalletClick = { currentTab = "profile" }
                         )
                     }
                 }
@@ -362,17 +334,23 @@ fun MainAppScreen(onLogout: () -> Unit) {
                             )
                             BusinessAddDestination.Post -> AddScreen(
                                 onPostAdded = {
+                                    linkedRequestIdForAdd = null
                                     businessAddDestination = BusinessAddDestination.Hub
                                     currentTab = "feed"
                                 },
                                 currentUserProfile = currentUserProfile,
-                                onBack = { businessAddDestination = BusinessAddDestination.Hub }
+                                onBack = { businessAddDestination = BusinessAddDestination.Hub },
+                                requestId = linkedRequestIdForAdd
                             )
                         }
                     } else {
                         AddScreen(
-                            onPostAdded = { currentTab = "feed" },
-                            currentUserProfile = currentUserProfile
+                            onPostAdded = {
+                                linkedRequestIdForAdd = null
+                                currentTab = "feed"
+                            },
+                            currentUserProfile = currentUserProfile,
+                            requestId = linkedRequestIdForAdd
                         )
                     }
                 }
@@ -409,14 +387,43 @@ fun MainAppScreen(onLogout: () -> Unit) {
     }
 
     if (activeRequest != null) {
-        val requestAnswers = allAnswers.filter { it.requestId == activeRequest!!.id }
-        RequestDetailScreen(
-            request = activeRequest!!,
-            answers = requestAnswers,
-            users = allUsers,
-            onBack = { activeRequest = null },
-            onUserProfileClick = { viewUserProfileId = it }
-        )
+        val requestAuthor = allUsers.find { it.uid == activeRequest!!.userId }
+            ?: UserProfile(uid = activeRequest!!.userId, name = "Member")
+        Surface(
+            modifier = Modifier
+                .fillMaxSize()
+                .zIndex(5f),
+            color = SoftPastelMint
+        ) {
+            RequestDetailScreen(
+                request = activeRequest!!,
+                requestAuthor = requestAuthor,
+                users = allUsers,
+                savedPostIds = savedPostIds,
+                viewerUid = currentUser?.uid,
+                onBack = { activeRequest = null },
+                onUserProfileClick = { viewUserProfileId = it },
+                onSaveClick = { postToSave = it },
+                onAudienceRate = { postId, stars -> ratePost(postId, stars) },
+                onOpenPost = { openPostId = it },
+                onAddRecommendation = { addPickForRequestId = activeRequest!!.id }
+            )
+        }
+    }
+
+    if (addPickForRequestId != null) {
+        Surface(
+            modifier = Modifier
+                .fillMaxSize()
+                .zIndex(6f),
+            color = SoftPastelMint
+        ) {
+            AddPickScreen(
+                requestId = addPickForRequestId!!,
+                currentUserProfile = currentUserProfile,
+                onDismiss = { addPickForRequestId = null }
+            )
+        }
     }
 
     if (postToSave != null) {
@@ -435,8 +442,7 @@ fun MainAppScreen(onLogout: () -> Unit) {
             onUserProfileClick = { viewUserProfileId = it },
             viewerUid = currentUser?.uid,
             onAudienceRate = { postId, stars -> ratePost(postId, stars) },
-            onOpenPost = { openPostId = it },
-            onLikeToggle = { toggleLike(it) }
+            onOpenPost = { openPostId = it }
         )
     }
 
@@ -449,7 +455,12 @@ fun MainAppScreen(onLogout: () -> Unit) {
                 allUsers = allUsers,
                 userPosts = realPosts.filter { it.userId == viewUserProfileId },
                 onBack = { viewUserProfileId = null },
-                onPostClick = { openPostId = it }
+                onPostClick = { openPostId = it },
+                onCollectionClick = { activeCollection = it },
+                onOfferClick = { offer ->
+                    profileOfferCache = offer
+                    selectedOfferId = offer.id
+                }
             )
         }
     }
@@ -466,21 +477,25 @@ fun MainAppScreen(onLogout: () -> Unit) {
                     onBack = { openPostId = null },
                     onSaveClick = { postToSave = it },
                     onUserProfileClick = { viewUserProfileId = it },
-                    onAudienceRate = { postId, stars -> ratePost(postId, stars) },
-                    onLikeToggle = { toggleLike(it) }
+                    onAudienceRate = { postId, stars -> ratePost(postId, stars) }
                 )
             }
         }
     }
 
     val offerForDetail = selectedOfferId?.let { id ->
-        myOffers.find { it.id == id } ?: feedActiveOffers.find { it.id == id }
+        myOffers.find { it.id == id }
+            ?: feedActiveOffers.find { it.id == id }
+            ?: profileOfferCache?.takeIf { it.id == id }
     }
     if (offerForDetail != null) {
         Surface(modifier = Modifier.fillMaxSize(), color = Color.White) {
             BusinessOfferDetailScreen(
                 offer = offerForDetail,
-                onBack = { selectedOfferId = null },
+                onBack = {
+                    selectedOfferId = null
+                    profileOfferCache = null
+                },
                 onPauseToggle = { toggleOfferPause(it) },
                 canManageCampaign = offerForDetail.businessId == currentUser?.uid
             )

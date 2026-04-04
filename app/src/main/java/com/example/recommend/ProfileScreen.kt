@@ -419,7 +419,9 @@ fun ProfileScreen(
                     myPosts = myPosts,
                     collections = collections,
                     onPostClick = onPostClick,
-                    onCollectionClick = onCollectionClick
+                    onCollectionClick = onCollectionClick,
+                    recsTabLabel = "My recs",
+                    collectionsTabLabel = "Collections"
                 )
             }
 
@@ -429,23 +431,26 @@ fun ProfileScreen(
                     isBusiness = userProfile.isBusiness,
                     onCreateCampaign = onCreateCampaign,
                     onOfferClick = onOfferClick,
-                    onOfferPauseToggle = onOfferPauseToggle
+                    onOfferPauseToggle = onOfferPauseToggle,
+                    isViewerOwner = true
                 )
             }
         }
     }
 }
 
-private fun LazyListScope.adsDashboardSection(
+internal fun LazyListScope.adsDashboardSection(
     myOffers: List<AdOffer>,
     isBusiness: Boolean,
     onCreateCampaign: () -> Unit,
     onOfferClick: (AdOffer) -> Unit,
-    onOfferPauseToggle: (AdOffer) -> Unit
+    onOfferPauseToggle: (AdOffer) -> Unit,
+    /** When false, viewing someone else: no new campaign, no pause, read-only list. */
+    isViewerOwner: Boolean = true
 ) {
     item {
         Text(
-            "Ad dashboard",
+            if (isViewerOwner) "Ad dashboard" else "Launched campaigns",
             style = AppTextStyles.Heading2.copy(fontSize = 20.sp),
             color = DarkPastelAnthracite,
             modifier = Modifier
@@ -453,14 +458,14 @@ private fun LazyListScope.adsDashboardSection(
                 .padding(bottom = 8.dp)
         )
         Text(
-            "Your campaigns and rewards.",
+            if (isViewerOwner) "Your campaigns and rewards." else "Campaigns they launched.",
             style = AppTextStyles.BodySmall,
             color = DarkPastelAnthracite.copy(alpha = 0.5f),
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 12.dp)
         )
-        if (isBusiness) {
+        if (isViewerOwner && isBusiness) {
             OutlinedButton(
                 onClick = onCreateCampaign,
                 modifier = Modifier
@@ -475,7 +480,7 @@ private fun LazyListScope.adsDashboardSection(
                 Text("New campaign", style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold, color = RichPastelCoral)
             }
             Spacer(modifier = Modifier.height(24.dp))
-        } else {
+        } else if (isViewerOwner && !isBusiness) {
             Text(
                 "Business accounts can launch sponsored campaigns from the Ads section.",
                 style = AppTextStyles.BodySmall,
@@ -484,40 +489,34 @@ private fun LazyListScope.adsDashboardSection(
             )
         }
     }
-    if (!isBusiness) {
-        if (myOffers.isNotEmpty()) {
-            items(myOffers, key = { it.id }) { offer ->
-                AdOfferProfileCard(
-                    offer = offer,
-                    onCardClick = { onOfferClick(offer) },
-                    showPauseButton = false,
-                    onPauseClick = {}
-                )
-            }
+    val showPause = isViewerOwner && isBusiness
+    when {
+        myOffers.isEmpty() -> item {
+            EmptyStateCard(
+                if (isViewerOwner) "No campaigns yet. Tap New campaign or + to launch your first offer."
+                else "No public campaigns yet."
+            )
         }
-    } else if (myOffers.isEmpty()) {
-        item {
-            EmptyStateCard("No campaigns yet. Tap New campaign or + to launch your first offer.")
-        }
-    } else {
-        items(myOffers, key = { it.id }) { offer ->
+        else -> items(myOffers, key = { it.id }) { offer ->
             AdOfferProfileCard(
                 offer = offer,
                 onCardClick = { onOfferClick(offer) },
-                showPauseButton = true,
+                showPauseButton = showPause,
                 onPauseClick = { onOfferPauseToggle(offer) }
             )
         }
     }
 }
 
-private fun LazyListScope.personalRecsAndCollectionsSection(
+internal fun LazyListScope.personalRecsAndCollectionsSection(
     selectedTab: Int,
     onSelectedTab: (Int) -> Unit,
     myPosts: List<Post>,
     collections: List<PostCollection>,
     onPostClick: (String) -> Unit,
-    onCollectionClick: (PostCollection) -> Unit
+    onCollectionClick: (PostCollection) -> Unit,
+    recsTabLabel: String = "My recs",
+    collectionsTabLabel: String = "Collections"
 ) {
     item {
         TabRow(
@@ -535,12 +534,12 @@ private fun LazyListScope.personalRecsAndCollectionsSection(
             Tab(
                 selected = selectedTab == 0,
                 onClick = { onSelectedTab(0) },
-                text = { Text("My recs", style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold) }
+                text = { Text(recsTabLabel, style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold) }
             )
             Tab(
                 selected = selectedTab == 1,
                 onClick = { onSelectedTab(1) },
-                text = { Text("Collections", style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold) }
+                text = { Text(collectionsTabLabel, style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold) }
             )
         }
         Spacer(modifier = Modifier.height(16.dp))

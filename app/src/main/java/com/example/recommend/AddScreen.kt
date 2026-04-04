@@ -48,7 +48,9 @@ import java.util.concurrent.Executors
 fun AddScreen(
     onPostAdded: () -> Unit,
     currentUserProfile: UserProfile? = null,
-    onBack: (() -> Unit)? = null
+    onBack: (() -> Unit)? = null,
+    /** Pack signal id when user taps Help — stored on post as [Post.replyToRequestId]. */
+    requestId: String? = null
 ) {
     var title by remember { mutableStateOf("") }
     var location by remember { mutableStateOf("") }
@@ -96,6 +98,10 @@ fun AddScreen(
         )
         if (!imageUrl.isNullOrBlank()) {
             postData["imageUrl"] = imageUrl
+        }
+        val replyRid = requestId?.trim().orEmpty()
+        if (replyRid.isNotEmpty()) {
+            postData["replyToRequestId"] = replyRid
         }
 
         db.trustListDataRoot()
@@ -200,6 +206,24 @@ fun AddScreen(
             contentPadding = PaddingValues(top = if (onBack != null) 8.dp else 24.dp, bottom = 100.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
+                if (!requestId.isNullOrBlank()) {
+                    item {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            color = MutedPastelTeal.copy(alpha = 0.12f)
+                        ) {
+                            Text(
+                                text = "Reply to signal",
+                                style = AppTextStyles.BodySmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MutedPastelTeal,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                            )
+                        }
+                    }
+                }
+
                 if (onBack == null) {
                     item {
                         Text("New recommendation", style = AppTextStyles.Heading2.copy(fontSize = 24.sp))

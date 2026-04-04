@@ -27,9 +27,30 @@ import com.example.recommend.ui.theme.MutedPastelTeal
 import com.example.recommend.ui.theme.ConvexCardBox
 import com.example.recommend.ui.theme.SoftPastelMint
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthException
 import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreException
+
+/** Firebase Auth errors (wrong password, unknown email) — not caused by missing Firestore fields. */
+private fun authErrorMessage(e: Exception): String {
+    val fe = e as? FirebaseAuthException ?: return e.localizedMessage ?: "Sign-in failed"
+    return when (fe.errorCode) {
+        "ERROR_WRONG_PASSWORD",
+        "ERROR_INVALID_PASSWORD" -> "Wrong password. Check spelling and Caps Lock, or reset the password in Firebase Console."
+        "ERROR_USER_NOT_FOUND" -> "No Firebase account for this email. Sign up first or use another email."
+        "ERROR_INVALID_EMAIL" -> "Invalid email format."
+        "ERROR_USER_DISABLED" -> "This account is disabled."
+        "ERROR_TOO_MANY_REQUESTS" -> "Too many attempts. Try again later."
+        "ERROR_INVALID_CREDENTIAL",
+        "ERROR_INVALID_USER_TOKEN",
+        "ERROR_USER_TOKEN_EXPIRED" ->
+            "Firebase rejected email/password (wrong password or no such user). This is not a database field issue — use \"Forgot password\" or verify the account exists in Firebase Authentication."
+        "ERROR_EMAIL_ALREADY_IN_USE" -> "This email is already registered. Sign in or use another address."
+        "ERROR_WEAK_PASSWORD" -> "Password is too weak (Firebase requires a stronger password)."
+        else -> fe.message ?: fe.localizedMessage ?: "Auth failed (${fe.errorCode})"
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,10 +79,22 @@ fun AuthScreen(onAuthSuccess: () -> Unit) {
 
         if (isLoginMode) {
             auth.signInWithEmailAndPassword(email.trim(), password)
-                .addOnSuccessListener { onAuthSuccess() }
+                .addOnSuccessListener { result ->
+                    val user = result.user
+                    if (user == null) {
+                        isLoading = false
+                        errorMessage = "Sign-in failed: empty user"
+                        return@addOnSuccessListener
+                    }
+                    // Merge missing Firestore fields before MainActivity shows the main UI.
+                    db.ensureUserProfileForAuthUser(user) {
+                        isLoading = false
+                        onAuthSuccess()
+                    }
+                }
                 .addOnFailureListener {
                     isLoading = false
-                    errorMessage = it.localizedMessage ?: "Sign-in failed"
+                    errorMessage = authErrorMessage(it)
                 }
         } else {
             auth.createUserWithEmailAndPassword(email.trim(), password)
@@ -127,7 +160,7 @@ fun AuthScreen(onAuthSuccess: () -> Unit) {
                 }
                 .addOnFailureListener {
                     isLoading = false
-                    errorMessage = it.localizedMessage ?: "Registration failed"
+                    errorMessage = authErrorMessage(it)
                 }
         }
     }

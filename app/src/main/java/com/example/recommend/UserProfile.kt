@@ -34,11 +34,81 @@ data class UserProfile(
 )
 
 /**
+ * When [toObject] fails (wrong field types in old documents), build profile from raw fields.
+ */
+internal fun userProfileFromSnapshotFields(snap: DocumentSnapshot): UserProfile {
+    val uid = snap.getString("uid") ?: snap.id
+    val name = snap.getString("name") ?: ""
+    val handle = snap.getString("handle") ?: ""
+    val bio = snap.getString("bio") ?: ""
+    val avatar = snap.getString("avatar") ?: ""
+    val following = normalizeFollowingField(snap.get("following"))
+
+    val trustScore = when (val r = snap.get("trustScore")) {
+        null -> 0.0
+        is Number -> r.toDouble()
+        is String -> r.toDoubleOrNull() ?: 0.0
+        else -> 0.0
+    }
+    val trustCoins = when (val r = snap.get("trustCoins")) {
+        null -> 0
+        is Number -> r.toInt()
+        is String -> r.toIntOrNull() ?: 0
+        else -> 0
+    }
+    val isBusiness = when (val r = snap.get("isBusiness")) {
+        is Boolean -> r
+        is String -> r.equals("true", ignoreCase = true)
+        else -> false
+    }
+    val businessProfile = parseBusinessProfile(snap.get("businessProfile"))
+    val trustRatings = parseTrustRatingsField(snap.get("trustRatings"))
+
+    return UserProfile(
+        uid = uid,
+        name = name,
+        handle = handle,
+        bio = bio,
+        avatar = avatar,
+        following = following,
+        trustScore = trustScore,
+        trustRatings = trustRatings,
+        isBusiness = isBusiness,
+        trustCoins = trustCoins,
+        businessProfile = businessProfile
+    )
+}
+
+private fun normalizeFollowingField(raw: Any?): List<String> {
+    return when (raw) {
+        null -> emptyList()
+        is List<*> -> raw.mapNotNull { it as? String }
+        else -> emptyList()
+    }
+}
+
+private fun parseTrustRatingsField(raw: Any?): Map<String, Int> {
+    return when (raw) {
+        is Map<*, *> -> raw.mapNotNull { (k, v) ->
+            val key = k as? String ?: return@mapNotNull null
+            val intVal = when (v) {
+                is Long -> v.toInt()
+                is Int -> v
+                is Number -> v.toInt()
+                else -> null
+            } ?: return@mapNotNull null
+            key to intVal.coerceIn(1, 5)
+        }.toMap()
+        else -> emptyMap()
+    }
+}
+
+/**
  * Maps Firestore documents to [UserProfile], normalizing numeric/boolean fields and nested maps.
  */
 fun DocumentSnapshot.toUserProfileOrNull(): UserProfile? {
     if (!exists()) return null
-    val parsed = toObject(UserProfile::class.java) ?: return null
+    val parsed = toObject(UserProfile::class.java) ?: userProfileFromSnapshotFields(this)
 
     val trustScoreRaw = get("trustScore")
     val trustScore = when (trustScoreRaw) {
@@ -58,19 +128,7 @@ fun DocumentSnapshot.toUserProfileOrNull(): UserProfile? {
 
     val businessProfile = parseBusinessProfile(get("businessProfile")) ?: parsed.businessProfile
 
-    val trustRatingsRaw = get("trustRatings")
-    val trustRatings = when (trustRatingsRaw) {
-        is Map<*, *> -> trustRatingsRaw.mapNotNull { (k, v) ->
-            val key = k as? String ?: return@mapNotNull null
-            val intVal = when (v) {
-                is Long -> v.toInt()
-                is Int -> v
-                else -> null
-            } ?: return@mapNotNull null
-            key to intVal.coerceIn(1, 5)
-        }.toMap()
-        else -> emptyMap()
-    }
+    val trustRatings = parseTrustRatingsField(get("trustRatings"))
 
     return parsed.copy(
         trustScore = trustScore,

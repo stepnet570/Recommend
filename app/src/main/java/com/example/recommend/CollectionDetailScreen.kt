@@ -1,4 +1,7 @@
 package com.example.recommend
+import com.example.recommend.ui.feed.*
+
+import com.example.recommend.data.model.*
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
@@ -31,8 +34,7 @@ fun CollectionDetailScreen(
     onUserProfileClick: (String) -> Unit = {},
     viewerUid: String? = null,
     onAudienceRate: (String, Int) -> Unit = { _, _ -> },
-    onOpenPost: ((String) -> Unit)? = null,
-    onLikeToggle: (String) -> Unit = {}
+    onOpenPost: ((String) -> Unit)? = null
 ) {
     BackHandler {
         onBack()
@@ -79,8 +81,7 @@ fun CollectionDetailScreen(
                         onUserProfileClick = onUserProfileClick,
                         viewerUid = viewerUid,
                         onAudienceRate = onAudienceRate,
-                        onOpenPost = onOpenPost,
-                        onLikeToggle = onLikeToggle
+                        onOpenPost = onOpenPost
                     )
                 }
             }

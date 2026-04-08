@@ -1,5 +1,7 @@
 package com.example.recommend
 
+import com.example.recommend.data.model.*
+
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent

@@ -1,5 +1,7 @@
 package com.example.recommend
 
+import com.example.recommend.data.model.*
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -24,13 +26,6 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 
-data class PostCollection(
-    val id: String = "",
-    val userId: String = "",
-    val name: String = "",
-    val postIds: List<String> = emptyList(),
-    val createdAt: Long = 0L
-)
 
 @Composable
 fun SaveCollectionDialog(

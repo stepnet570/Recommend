@@ -1,4 +1,7 @@
 package com.example.recommend
+import com.example.recommend.ui.feed.*
+
+import com.example.recommend.data.model.*
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*

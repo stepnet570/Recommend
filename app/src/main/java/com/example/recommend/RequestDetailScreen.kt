@@ -1,4 +1,7 @@
 package com.example.recommend
+import com.example.recommend.ui.feed.*
+
+import com.example.recommend.data.model.*
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -23,6 +26,7 @@ import com.example.recommend.ui.theme.DarkPastelAnthracite
 import com.example.recommend.ui.theme.MutedPastelTeal
 import com.example.recommend.ui.theme.SoftPastelMint
 import com.example.recommend.ui.theme.SurfaceMuted
+import com.example.recommend.ui.theme.PrimaryGradient
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 
@@ -130,24 +134,21 @@ fun RequestDetailScreen(
                 tonalElevation = 4.dp,
                 shadowElevation = 10.dp
             ) {
-                Button(
-                    onClick = onAddRecommendation,
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 12.dp)
-                        .height(54.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.Black,
-                        contentColor = Color.White
-                    ),
-                    shape = RoundedCornerShape(16.dp)
+                        .height(54.dp)
+                        .background(brush = PrimaryGradient, shape = RoundedCornerShape(16.dp))
+                        .clickable { onAddRecommendation() },
+                    contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = "Add a pick",
                         fontFamily = BodyFontFamily,
                         fontWeight = FontWeight.Bold,
                         fontSize = 16.sp,
-                        color = Color.White
+                        color = Color(0xFF1A2A24)
                     )
                 }
             }

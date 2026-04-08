@@ -1,5 +1,7 @@
 package com.example.recommend
 
+import com.example.recommend.data.model.*
+
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
@@ -36,6 +38,7 @@ import com.example.recommend.ui.theme.DarkPastelAnthracite
 import com.example.recommend.ui.theme.MutedPastelTeal
 import com.example.recommend.ui.theme.SoftPastelMint
 import com.example.recommend.ui.theme.SurfaceMuted
+import com.example.recommend.ui.theme.PrimaryGradient
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
@@ -337,20 +340,21 @@ fun AddPickScreen(
                     onClick = { submit() },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(52.dp),
+                        .height(52.dp)
+                        .background(brush = PrimaryGradient, shape = RoundedCornerShape(16.dp)),
                     enabled = !isUploading && title.isNotBlank(),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.Black,
-                        contentColor = Color.White,
-                        disabledContainerColor = Color.Black.copy(alpha = 0.38f),
-                        disabledContentColor = Color.White.copy(alpha = 0.62f)
+                        containerColor = Color.Transparent,
+                        contentColor = Color(0xFF1A2A24),
+                        disabledContainerColor = Color(0xFFE8F5F0),
+                        disabledContentColor = Color(0xFF6B8C80)
                     ),
                     shape = RoundedCornerShape(16.dp)
                 ) {
                     if (isUploading) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(24.dp),
-                            color = Color.White,
+                            color = Color(0xFF1A2A24),
                             strokeWidth = 2.dp
                         )
                     } else {
@@ -359,7 +363,7 @@ fun AddPickScreen(
                             fontFamily = BodyFontFamily,
                             fontWeight = FontWeight.Bold,
                             fontSize = 16.sp,
-                            color = Color.White
+                            color = Color(0xFF1A2A24)
                         )
                     }
                 }

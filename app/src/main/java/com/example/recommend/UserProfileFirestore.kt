@@ -1,5 +1,7 @@
 package com.example.recommend
 
+import com.example.recommend.data.model.*
+
 import android.content.Context
 import androidx.core.content.edit
 import android.util.Log

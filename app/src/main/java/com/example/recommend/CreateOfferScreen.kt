@@ -1,8 +1,11 @@
 package com.example.recommend
 
+import com.example.recommend.data.model.*
+
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -270,8 +273,8 @@ fun CreateOfferScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("0", style = AppTextStyles.BodySmall, color = MutedPastelTeal)
-                        Text("5", style = AppTextStyles.BodySmall, color = MutedPastelTeal)
+                        Text("0", style = AppTextStyles.BodySmall, color = Color(0xFF2D3A36))
+                        Text("5", style = AppTextStyles.BodySmall, color = Color(0xFF2D3A36))
                     }
 
                     Spacer(modifier = Modifier.height(28.dp))
@@ -281,17 +284,21 @@ fun CreateOfferScreen(
                         enabled = !isSubmitting,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(54.dp),
+                            .height(54.dp)
+                            .background(
+                                brush = Brush.horizontalGradient(listOf(Color(0xFF7AE23A), Color(0xFF3BD4C0))),
+                                shape = RoundedCornerShape(16.dp)
+                            ),
                         shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = scheme.primary,
-                            contentColor = scheme.onPrimary
+                            containerColor = Color.Transparent,
+                            contentColor = Color.White
                         )
                     ) {
                         if (isSubmitting) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(24.dp),
-                                color = scheme.onPrimary,
+                                color = Color.White,
                                 strokeWidth = 2.dp
                             )
                         } else {
@@ -300,7 +307,7 @@ fun CreateOfferScreen(
                                 style = AppTextStyles.BodyMedium,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 16.sp,
-                                color = scheme.onPrimary
+                                color = Color.White
                             )
                         }
                     }

@@ -1,4 +1,8 @@
 package com.example.recommend
+import com.example.recommend.ui.feed.*
+import com.example.recommend.ui.profile.*
+
+import com.example.recommend.data.model.*
 
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke

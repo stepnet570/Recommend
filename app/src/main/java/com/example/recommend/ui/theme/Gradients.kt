@@ -1,7 +1,8 @@
 package com.example.recommend.ui.theme
 import androidx.compose.ui.graphics.Brush
 
-val PrimaryGradient = Brush.horizontalGradient(listOf(AppLime, AppTeal))
-val PrimaryGradientVert = Brush.verticalGradient(listOf(AppLime, AppTeal))
-val PrimaryGradientLinear = Brush.linearGradient(listOf(AppLime, AppTeal))
+// Violet → Teal: premium gradient, used on FAB, primary buttons, TrustScoreRing
+val PrimaryGradient = Brush.horizontalGradient(listOf(AppViolet, AppTeal))
+val PrimaryGradientVert = Brush.verticalGradient(listOf(AppViolet, AppTeal))
+val PrimaryGradientLinear = Brush.linearGradient(listOf(AppViolet, AppTeal))
 val DisabledGradient = Brush.linearGradient(listOf(AppDisabled, AppDisabled))

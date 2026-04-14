@@ -1,11 +1,16 @@
 package com.example.recommend.ui.theme
 import androidx.compose.ui.graphics.Color
 
-val AppLime = Color(0xFF7AE23A)
+// Primary accent — replaces Lime. Violet feels premium, pairs beautifully with Teal.
+val AppViolet = Color(0xFF7C6FE0)
+// Keep AppLime as alias so existing references still compile
+val AppLime = AppViolet
+
 val AppTeal = Color(0xFF3BD4C0)
 val AppDark = Color(0xFF1A2A24)
-val AppBackground = Color(0xFFF6FEFB)
-val AppMuted = Color(0xFF6B8C80)
+// Warm off-white — replaces cold mint, removes the "medical startup" feel
+val AppBackground = Color(0xFFF8F7F4)
+val AppMuted = Color(0xFF8A9A95)
 val AppGold = Color(0xFFD4AF37)
 val AppBorder = Color(0x263BD4C0)
 val AppSurface = Color(0xFF1A3328)
@@ -21,7 +26,8 @@ val RichPastelCoral = AppTeal
 val MutedPastelTeal = AppMuted
 val MutedPastelGold = AppGold
 val SurfacePastel = AppWhite
-val SurfaceMuted = Color(0xFFE8F5F0)
+// Warm neutral for card sections — replaces cold minty green
+val SurfaceMuted = Color(0xFFF0EEEB)
 val GradientTop = AppBackground
 val GradientMid = AppBackground
 val GradientBottom = AppBackground

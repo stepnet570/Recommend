@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.recommend.ui.theme.AppTextStyles
+import com.example.recommend.ui.theme.AppBackground
 import com.example.recommend.ui.theme.DarkPastelAnthracite
 import com.example.recommend.ui.theme.MutedPastelTeal
 
@@ -34,7 +35,7 @@ fun PostDetailScreen(
     BackHandler(onBack = onBack)
 
     Scaffold(
-        containerColor = Color.White,
+        containerColor = AppBackground,
         topBar = {
             TopAppBar(
                 title = {
@@ -51,7 +52,7 @@ fun PostDetailScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MutedPastelTeal)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = AppBackground)
             )
         }
     ) { paddingValues ->

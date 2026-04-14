@@ -163,7 +163,7 @@ fun ProfileScreen(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
+            .background(AppBackground)
             .padding(horizontal = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         contentPadding = PaddingValues(top = 16.dp, bottom = 32.dp)

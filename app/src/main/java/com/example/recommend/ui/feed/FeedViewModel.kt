@@ -74,10 +74,26 @@ class FeedViewModel : ViewModel() {
         .map { collections -> collections.flatMap { it.postIds }.toSet() }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
 
-    /** Posts that are not replies to a pack signal — shown on the home feed. */
-    val feedPostsForHome: StateFlow<List<Post>> = _posts
-        .map { posts -> posts.filter { it.replyToRequestId.isNullOrBlank() } }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    /**
+     * Посты для главной ленты:
+     * — только от пользователей из following (+ свои посты)
+     * — без ответов на запросы (replyToRequestId)
+     * — fallback: если ещё никого не фолловишь — показываем всех (cold start)
+     */
+    val feedPostsForHome: StateFlow<List<Post>> = combine(_posts, _currentUser) { posts, currentUser ->
+        val uid = currentUser?.uid
+        val following = currentUser?.following?.toSet() ?: emptySet()
+        val filtered = posts.filter { post ->
+            post.replyToRequestId.isNullOrBlank() &&
+            (post.userId == uid || following.contains(post.userId))
+        }
+        // Cold start: если никого не фолловим — показываем всех
+        if (following.isEmpty()) {
+            posts.filter { it.replyToRequestId.isNullOrBlank() }
+        } else {
+            filtered
+        }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     /**
      * Active offers shown in the feed carousel.

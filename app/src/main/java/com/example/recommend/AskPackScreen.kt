@@ -39,10 +39,7 @@ import com.example.recommend.ui.theme.AppTextStyles
 import com.example.recommend.ui.theme.ConvexCardBox
 import com.example.recommend.ui.theme.DarkPastelAnthracite
 import com.example.recommend.ui.theme.MutedPastelTeal
-import com.example.recommend.ui.theme.RichPastelCoral
 import com.example.recommend.ui.theme.SurfaceMuted
-import com.example.recommend.ui.theme.AppTeal
-import com.example.recommend.ui.theme.AppLime
 import com.example.recommend.ui.theme.PrimaryGradientLinear
 import com.example.recommend.ui.theme.DisabledGradient
 import com.example.recommend.ui.theme.AppOnDisabled
@@ -128,8 +125,9 @@ fun AskPackScreen(
                     Icon(Icons.Filled.Close, contentDescription = "Close", tint = MutedPastelTeal)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Box(modifier = Modifier.height(6.dp).width(if (step >= 1) 24.dp else 8.dp).clip(CircleShape).background(if (step >= 1) AppTeal else SurfaceMuted))
-                    Box(modifier = Modifier.height(6.dp).width(if (step >= 2) 24.dp else 8.dp).clip(CircleShape).background(if (step >= 2) AppTeal else SurfaceMuted))
+                    val inactiveDot = Brush.linearGradient(listOf(SurfaceMuted, SurfaceMuted))
+                    Box(modifier = Modifier.height(6.dp).width(if (step >= 1) 24.dp else 8.dp).clip(CircleShape).background(if (step >= 1) PrimaryGradientLinear else inactiveDot))
+                    Box(modifier = Modifier.height(6.dp).width(if (step >= 2) 24.dp else 8.dp).clip(CircleShape).background(if (step >= 2) PrimaryGradientLinear else inactiveDot))
                 }
                 Spacer(modifier = Modifier.width(48.dp))
             }
@@ -154,7 +152,8 @@ fun AskPackScreen(
                                         focusedBorderColor = Color.Transparent,
                                         unfocusedBorderColor = Color.Transparent,
                                         focusedTextColor = DarkPastelAnthracite,
-                                        unfocusedTextColor = DarkPastelAnthracite
+                                        unfocusedTextColor = DarkPastelAnthracite,
+                                        cursorColor = AppViolet
                                     )
                                 )
 
@@ -256,7 +255,7 @@ fun AskPackScreen(
                                     if (packUsers.isNotEmpty()) {
                                         Text(
                                             text = if (selectedUsers.size == packUsers.size) "Clear selection" else "Select all",
-                                            color = RichPastelCoral,
+                                            color = AppDark,
                                             fontWeight = FontWeight.Bold,
                                             modifier = Modifier.clickable { selectedUsers = if (selectedUsers.size == packUsers.size) emptySet() else packUsers.map { it.uid }.toSet() }
                                         )

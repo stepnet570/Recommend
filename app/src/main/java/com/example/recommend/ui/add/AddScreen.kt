@@ -60,6 +60,8 @@ fun AddScreen(
     requestId: String? = null,
     /** Offer id when creating a sponsored post after accepting a deal. */
     offerId: String? = null,
+    /** Offer title shown in the sponsored banner so the user knows what content to create. */
+    offerTitle: String? = null,
     isSponsored: Boolean = false
 ) {
     var title by remember { mutableStateOf("") }
@@ -227,13 +229,35 @@ fun AddScreen(
                             shape = RoundedCornerShape(12.dp),
                             color = MutedPastelGold.copy(alpha = 0.14f)
                         ) {
-                            Text(
-                                text = "Sponsored post · deal accepted",
-                                style = AppTextStyles.BodySmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MutedPastelGold,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-                            )
+                            Column(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Filled.Stars,
+                                        contentDescription = null,
+                                        tint = MutedPastelGold,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Text(
+                                        text = "Sponsored post · deal accepted",
+                                        style = AppTextStyles.BodySmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MutedPastelGold
+                                    )
+                                }
+                                if (!offerTitle.isNullOrBlank()) {
+                                    Text(
+                                        text = offerTitle,
+                                        style = AppTextStyles.BodySmall,
+                                        color = MutedPastelGold.copy(alpha = 0.75f)
+                                    )
+                                }
+                            }
                         }
                     }
                 }

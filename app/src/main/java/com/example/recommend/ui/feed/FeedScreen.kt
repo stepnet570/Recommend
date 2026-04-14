@@ -1,6 +1,7 @@
 package com.example.recommend.ui.feed
 
 import com.example.recommend.*
+import com.example.recommend.ui.theme.*
 import com.example.recommend.data.model.*
 
 import android.content.Intent
@@ -41,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 import coil.compose.AsyncImage
 import coil.compose.AsyncImagePainter
 import coil.compose.rememberAsyncImagePainter
@@ -57,6 +59,8 @@ import com.example.recommend.ui.theme.SurfaceMuted
 import com.example.recommend.ui.theme.SurfacePastel
 import androidx.compose.ui.graphics.Brush
 import com.example.recommend.ui.theme.PrimaryGradient
+import com.example.recommend.ui.theme.AppDark
+import com.example.recommend.ui.theme.PrimaryGradientLinear
 
 
 
@@ -191,8 +195,9 @@ fun FeedScreen(
     followingUserIds: Set<String> = emptySet(),
     savedPostIds: Set<String> = emptySet(),
     activeOffers: List<AdOffer> = emptyList(),
+    acceptedOfferIds: Set<String> = emptySet(),
     trustCoins: Int = 0,
-    onOfferAccept: (AdOffer) -> Unit = {},
+    onOfferClick: (AdOffer) -> Unit = {},
     onAskPackClick: () -> Unit,
     onRequestClick: (PackRequest) -> Unit,
     /** Open request detail (e.g. own signal card). */
@@ -200,6 +205,7 @@ fun FeedScreen(
     /** Help on a friend's request: open add-pick flow for [PackRequest.id]. */
     onHelpRequest: (PackRequest) -> Unit = {},
     onSaveClick: (String) -> Unit,
+    onUserClick: (String) -> Unit = {},
     onUserProfileClick: (String) -> Unit = {},
     onRequestAuthorProfileClick: (String) -> Unit = {},
     viewerUid: String? = null,
@@ -239,7 +245,7 @@ fun FeedScreen(
         requests.filter { it.status.equals("active", ignoreCase = true) }
     }
 
-    Scaffold(containerColor = Color.Transparent) { paddingValues ->
+    Scaffold(containerColor = Color.White) { paddingValues ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -273,6 +279,7 @@ fun FeedScreen(
                         viewerUid = viewerUid,
                         onSignalRequestOpen = onSignalRequestOpen,
                         onHelpRequest = onHelpRequest,
+                        onAuthorClick = onUserClick,
                         onRecipientProfileClick = onUserProfileClick
                     )
                 }
@@ -292,7 +299,8 @@ fun FeedScreen(
                 item {
                     ExclusiveDealsSection(
                         offers = activeOffers,
-                        onOfferAccept = onOfferAccept
+                        acceptedOfferIds = acceptedOfferIds,
+                        onOfferClick = onOfferClick
                     )
                 }
             }
@@ -332,6 +340,7 @@ fun PackSignalsBlock(
     viewerUid: String?,
     onSignalRequestOpen: (PackRequest) -> Unit,
     onHelpRequest: (PackRequest) -> Unit,
+    onAuthorClick: (String) -> Unit = {},
     onRecipientProfileClick: (String) -> Unit = {}
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -347,6 +356,7 @@ fun PackSignalsBlock(
                     viewerUid = viewerUid,
                     onSignalRequestOpen = onSignalRequestOpen,
                     onHelpRequest = onHelpRequest,
+                    onAuthorClick = onAuthorClick,
                     onRecipientProfileClick = onRecipientProfileClick
                 )
             }
@@ -450,6 +460,7 @@ private fun PackSignalRequestCard(
     viewerUid: String?,
     onSignalRequestOpen: (PackRequest) -> Unit,
     onHelpRequest: (PackRequest) -> Unit,
+    onAuthorClick: (String) -> Unit = {},
     onRecipientProfileClick: (String) -> Unit = {}
 ) {
     val isMine = viewerUid != null && request.authorId == viewerUid
@@ -460,7 +471,7 @@ private fun PackSignalRequestCard(
             .width(PackSignalCardWidth)
             .height(PackSignalCardHeight),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = SoftPastelMint),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Column(
@@ -497,7 +508,8 @@ private fun PackSignalRequestCard(
                 } else {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.clickable { onAuthorClick(request.userId) }
                     ) {
                         FeedUserAvatar(
                             imageUrl = authorUser?.avatar,
@@ -575,7 +587,7 @@ fun PackPulseStoriesBlock(
                 fontFamily = BodyFontFamily,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = Color(0xFF2D3A36)
+                color = AppDark
             )
         }
 
@@ -650,27 +662,16 @@ private fun FeedTopBarRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        OutlinedTextField(
+        AppTextField(
             value = searchQuery,
             onValueChange = onSearchChange,
             modifier = Modifier.weight(1f),
-            placeholder = {
-                Text(
-                    "Where's the best ceja de bife?",
-                    style = AppTextStyles.BodyMedium,
-                    color = DarkPastelAnthracite.copy(alpha = 0.45f)
-                )
-            },
+            placeholder = "Where's the best ceja de bife?",
             singleLine = true,
             shape = RoundedCornerShape(18.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = scheme.primary,
-                unfocusedBorderColor = SurfaceMuted,
-                focusedContainerColor = Color.White,
-                unfocusedContainerColor = Color.White
-            ),
+            containerColor = AppWhite,
             leadingIcon = {
-                Icon(Icons.Filled.Search, contentDescription = null, tint = MutedPastelTeal)
+                Icon(Icons.Filled.Search, contentDescription = null, tint = AppTeal)
             }
         )
 
@@ -702,7 +703,8 @@ private fun FeedTopBarRow(
 @Composable
 private fun ExclusiveDealsSection(
     offers: List<AdOffer>,
-    onOfferAccept: (AdOffer) -> Unit
+    acceptedOfferIds: Set<String> = emptySet(),
+    onOfferClick: (AdOffer) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
@@ -710,81 +712,153 @@ private fun ExclusiveDealsSection(
             style = AppTextStyles.Heading2.copy(fontSize = 20.sp),
             modifier = Modifier.padding(start = 4.dp, bottom = 12.dp)
         )
-        LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = PaddingValues(horizontal = 4.dp)
-        ) {
-            items(offers, key = { it.id }) { offer ->
-                ExclusiveOfferCard(offer = offer, onAccept = { onOfferAccept(offer) })
+        Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+            offers.forEach { offer ->
+                DealCard(
+                    offer = offer,
+                    isAccepted = offer.id in acceptedOfferIds,
+                    onClick = { onOfferClick(offer) }
+                )
             }
         }
     }
 }
 
 @Composable
-fun ExclusiveOfferCard(offer: AdOffer, onAccept: () -> Unit) {
-    val scheme = MaterialTheme.colorScheme
-    Surface(
+fun DealCard(
+    offer: AdOffer,
+    isAccepted: Boolean = false,
+    onClick: () -> Unit
+) {
+    ConvexCardBox(
         modifier = Modifier
-            .width(208.dp)
-            .height(136.dp),
-        shape = RoundedCornerShape(22.dp),
-        color = SurfacePastel,
-        shadowElevation = 6.dp
+            .fillMaxWidth()
+            .padding(bottom = 12.dp)
+            .clickable { onClick() },
+        shape = RoundedCornerShape(24.dp),
+        elevation = 22.dp
     ) {
-        Column(
-            modifier = Modifier
-                .padding(12.dp)
-                .fillMaxSize(),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            // Row 1: megaphone icon + businessName + status badge
+            Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     Icons.Filled.Campaign,
                     contentDescription = null,
                     tint = MutedPastelGold,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(18.dp)
                 )
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(6.dp))
                 Text(
-                    offer.businessName.ifBlank { offer.title },
-                    style = AppTextStyles.BodyMedium,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                    color = DarkPastelAnthracite
+                    text = offer.businessName,
+                    style = AppTextStyles.BodySmall,
+                    color = DarkPastelAnthracite.copy(alpha = 0.6f),
+                    modifier = Modifier.weight(1f)
                 )
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (isAccepted) MutedPastelTeal.copy(alpha = 0.12f)
+                            else MutedPastelGold.copy(alpha = 0.12f)
+                ) {
+                    Text(
+                        text = if (isAccepted) "✓ Accepted" else "Active",
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                        style = AppTextStyles.BodySmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (isAccepted) MutedPastelTeal else MutedPastelGold
+                    )
+                }
             }
+
+            Spacer(Modifier.height(10.dp))
+
+            // Row 2: offer title
             Text(
-                "+${offer.rewardCoins} TC",
-                style = AppTextStyles.BodySmall,
-                color = Color(0xFF2D3A36),
-                fontWeight = FontWeight.Bold
+                text = offer.title,
+                style = AppTextStyles.BodyMedium,
+                fontWeight = FontWeight.Bold,
+                fontSize = 16.sp,
+                color = DarkPastelAnthracite
             )
-            Button(
-                onClick = onAccept,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(36.dp)
-                    .background(
-                        brush = Brush.horizontalGradient(listOf(Color(0xFF7AE23A), Color(0xFF3BD4C0))),
-                        shape = RoundedCornerShape(12.dp)
-                    ),
-                shape = RoundedCornerShape(12.dp),
-                contentPadding = PaddingValues(horizontal = 8.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.Transparent,
-                    contentColor = Color.White
+
+            Spacer(Modifier.height(12.dp))
+
+            // Row 3: three info chips
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // Chip 1: reward
+                InfoChip(
+                    icon = {
+                        Icon(
+                            Icons.Filled.AccountBalanceWallet,
+                            contentDescription = null,
+                            tint = MutedPastelGold,
+                            modifier = Modifier.size(13.dp)
+                        )
+                    },
+                    text = "+${offer.rewardCoins} TC",
+                    bgColor = MutedPastelGold.copy(alpha = 0.10f),
+                    textColor = MutedPastelGold
                 )
-            ) {
-                Text(
-                    "Accept",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
+                // Chip 2: duration / days left
+                val daysLeft = if (offer.expiresAt > 0) {
+                    val d = TimeUnit.MILLISECONDS.toDays(
+                        offer.expiresAt - System.currentTimeMillis()
+                    ).toInt()
+                    if (d > 0) "$d days left" else "Last day"
+                } else {
+                    "${offer.durationDays}d"
+                }
+                InfoChip(
+                    icon = {
+                        Icon(
+                            Icons.Filled.Timer,
+                            contentDescription = null,
+                            tint = RichPastelCoral,
+                            modifier = Modifier.size(13.dp)
+                        )
+                    },
+                    text = daysLeft,
+                    bgColor = RichPastelCoral.copy(alpha = 0.10f),
+                    textColor = RichPastelCoral
+                )
+                // Chip 3: min trust score
+                InfoChip(
+                    icon = {
+                        Icon(
+                            Icons.Filled.Star,
+                            contentDescription = null,
+                            tint = MutedPastelTeal,
+                            modifier = Modifier.size(13.dp)
+                        )
+                    },
+                    text = "Score ${String.format("%.1f", offer.minTrustScore)}+",
+                    bgColor = MutedPastelTeal.copy(alpha = 0.10f),
+                    textColor = MutedPastelTeal
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun InfoChip(
+    icon: @Composable () -> Unit,
+    text: String,
+    bgColor: Color,
+    textColor: Color
+) {
+    Surface(shape = RoundedCornerShape(8.dp), color = bgColor) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            icon()
+            Text(
+                text = text,
+                style = AppTextStyles.BodySmall,
+                fontWeight = FontWeight.SemiBold,
+                color = textColor
+            )
         }
     }
 }
@@ -836,7 +910,7 @@ private fun PackFriendRequestCard(
             .width(280.dp)
             .height(168.dp),
         shape = RoundedCornerShape(24.dp),
-        color = SoftPastelMint,
+        color = Color.White,
         shadowElevation = 4.dp,
         tonalElevation = 0.dp
     ) {
@@ -877,7 +951,7 @@ private fun PackFriendRequestCard(
             }
             TextButton(
                 onClick = onOpen,
-                colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFF2D3A36))
+                colors = ButtonDefaults.textButtonColors(contentColor = AppDark)
             ) {
                 Text("Reply", fontWeight = FontWeight.Bold)
                 Spacer(Modifier.width(4.dp))
@@ -916,7 +990,7 @@ private fun PackAskEmptyCard(onAskPackClick: () -> Unit) {
                 onClick = onAskPackClick,
                 modifier = Modifier
                     .background(
-                        brush = Brush.horizontalGradient(listOf(Color(0xFF7AE23A), Color(0xFF3BD4C0))),
+                        brush = PrimaryGradient,
                         shape = RoundedCornerShape(14.dp)
                     ),
                 shape = RoundedCornerShape(14.dp),
@@ -985,23 +1059,29 @@ fun FeedPostCard(
                         Surface(
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
-                                .padding(12.dp),
+                                .padding(8.dp),
                             shape = RoundedCornerShape(8.dp),
-                            color = MutedPastelGold,
-                            shadowElevation = 2.dp
+                            color = MutedPastelGold.copy(alpha = 0.15f)
                         ) {
-                            Text(
-                                "Partner",
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                                color = Color.White,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Filled.Stars, null, tint = MutedPastelGold, modifier = Modifier.size(12.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text(
+                                    "Sponsored",
+                                    style = AppTextStyles.BodySmall,
+                                    color = MutedPastelGold,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
                 }
             }
 
+            Box(modifier = Modifier.fillMaxWidth()) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1009,21 +1089,6 @@ fun FeedPostCard(
                     .then(if (post.imageUrl.isNullOrBlank()) openPostModifier else Modifier),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                if (post.isSponsored && post.imageUrl.isNullOrBlank()) {
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = MutedPastelGold,
-                        shadowElevation = 2.dp
-                    ) {
-                        Text(
-                            "Partner",
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                            color = Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
                 Box(
                     modifier = Modifier
                         .background(SurfaceMuted, RoundedCornerShape(8.dp))
@@ -1083,6 +1148,30 @@ fun FeedPostCard(
                     PostLinkPreviewCard(url)
                 }
             }
+            if (post.isSponsored && post.imageUrl.isNullOrBlank()) {
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    color = MutedPastelGold.copy(alpha = 0.15f)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Filled.Stars, null, tint = MutedPastelGold, modifier = Modifier.size(12.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            "Sponsored",
+                            style = AppTextStyles.BodySmall,
+                            color = MutedPastelGold,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+            } // end content Box
 
             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                 Row(
@@ -1215,7 +1304,7 @@ private fun PostLinkPreviewCard(url: String) {
                 Text(
                     text = "Tap to open",
                     style = AppTextStyles.BodySmall,
-                    color = Color(0xFF2D3A36),
+                    color = AppDark,
                     fontWeight = FontWeight.Medium,
                     modifier = Modifier.padding(top = 4.dp)
                 )
@@ -1319,8 +1408,30 @@ fun PostCard(
                 }
             }
             Column(modifier = Modifier.padding(20.dp).then(openPostModifier)) {
-                Box(modifier = Modifier.background(SurfaceMuted, RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 4.dp)) {
-                    Text(post.category.uppercase(), style = AppTextStyles.BodySmall, fontWeight = FontWeight.Bold, color = DarkPastelAnthracite.copy(alpha = 0.7f))
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(modifier = Modifier.background(SurfaceMuted, RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 4.dp)) {
+                        Text(post.category.uppercase(), style = AppTextStyles.BodySmall, fontWeight = FontWeight.Bold, color = DarkPastelAnthracite.copy(alpha = 0.7f))
+                    }
+                    if (post.isSponsored) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(
+                                    PrimaryGradientLinear
+                                )
+                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                "✦ Sponsored",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
@@ -1355,7 +1466,7 @@ fun PostCard(
                         Text(
                             post.location,
                             style = AppTextStyles.BodyMedium,
-                            color = Color(0xFF2D3A36),
+                            color = AppDark,
                             fontWeight = FontWeight.Medium,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,

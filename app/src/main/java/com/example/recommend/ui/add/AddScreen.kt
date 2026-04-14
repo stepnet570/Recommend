@@ -1,6 +1,7 @@
 package com.example.recommend.ui.add
 
 import com.example.recommend.*
+import com.example.recommend.ui.theme.*
 import com.example.recommend.data.model.*
 
 import android.net.Uri
@@ -41,6 +42,8 @@ import com.example.recommend.ui.theme.MutedPastelGold
 import com.example.recommend.ui.theme.MutedPastelTeal
 import com.example.recommend.ui.theme.SoftPastelMint
 import com.example.recommend.ui.theme.SurfaceMuted
+import com.example.recommend.ui.theme.AppDark
+import com.example.recommend.ui.theme.PrimaryGradient
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
@@ -54,7 +57,10 @@ fun AddScreen(
     currentUserProfile: UserProfile? = null,
     onBack: (() -> Unit)? = null,
     /** Pack signal id when user taps Help — stored on post as [Post.replyToRequestId]. */
-    requestId: String? = null
+    requestId: String? = null,
+    /** Offer id when creating a sponsored post after accepting a deal. */
+    offerId: String? = null,
+    isSponsored: Boolean = false
 ) {
     var title by remember { mutableStateOf("") }
     var location by remember { mutableStateOf("") }
@@ -106,6 +112,10 @@ fun AddScreen(
         val replyRid = requestId?.trim().orEmpty()
         if (replyRid.isNotEmpty()) {
             postData["replyToRequestId"] = replyRid
+        }
+        if (isSponsored && !offerId.isNullOrBlank()) {
+            postData["isSponsored"] = true
+            postData["offerId"] = offerId
         }
 
         db.trustListDataRoot()
@@ -175,7 +185,7 @@ fun AddScreen(
     }
 
     Scaffold(
-        containerColor = SoftPastelMint,
+        containerColor = Color.White,
         topBar = {
             if (onBack != null) {
                 TopAppBar(
@@ -194,7 +204,7 @@ fun AddScreen(
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = SoftPastelMint,
+                        containerColor = Color.White,
                         titleContentColor = DarkPastelAnthracite,
                         navigationIconContentColor = MutedPastelTeal
                     )
@@ -210,6 +220,24 @@ fun AddScreen(
             contentPadding = PaddingValues(top = if (onBack != null) 8.dp else 24.dp, bottom = 100.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
+                if (isSponsored && !offerId.isNullOrBlank()) {
+                    item {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            color = MutedPastelGold.copy(alpha = 0.14f)
+                        ) {
+                            Text(
+                                text = "Sponsored post · deal accepted",
+                                style = AppTextStyles.BodySmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MutedPastelGold,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                            )
+                        }
+                    }
+                }
+
                 if (!requestId.isNullOrBlank()) {
                     item {
                         Surface(
@@ -221,7 +249,7 @@ fun AddScreen(
                                 text = "Reply to signal",
                                 style = AppTextStyles.BodySmall,
                                 fontWeight = FontWeight.SemiBold,
-                                color = Color(0xFF2D3A36),
+                                color = AppDark,
                                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
                             )
                         }
@@ -295,13 +323,11 @@ fun AddScreen(
                             Spacer(modifier = Modifier.height(24.dp))
 
                             Text("PLACE NAME", style = AppTextStyles.BodySmall, color = DarkPastelAnthracite.copy(alpha = 0.45f))
-                            OutlinedTextField(
+                            AppTextField(
                                 value = title,
                                 onValueChange = { title = it },
                                 modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(16.dp),
-                                singleLine = true,
-                                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = scheme.primary)
+                                singleLine = true
                             )
 
                             Spacer(modifier = Modifier.height(24.dp))
@@ -321,14 +347,12 @@ fun AddScreen(
                             Spacer(modifier = Modifier.height(24.dp))
 
                             Text("WHERE IS IT?", style = AppTextStyles.BodySmall, color = DarkPastelAnthracite.copy(alpha = 0.45f))
-                            OutlinedTextField(
+                            AppTextField(
                                 value = location,
                                 onValueChange = { location = it },
-                                leadingIcon = { Icon(Icons.Filled.LocationOn, null, tint = MutedPastelTeal) },
+                                leadingIcon = { Icon(Icons.Filled.LocationOn, null, tint = AppTeal) },
                                 modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(16.dp),
-                                singleLine = true,
-                                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = scheme.primary)
+                                singleLine = true
                             )
 
                             Spacer(modifier = Modifier.height(24.dp))
@@ -348,31 +372,29 @@ fun AddScreen(
                             Spacer(modifier = Modifier.height(24.dp))
 
                             Text("WHY DO YOU RECOMMEND IT?", style = AppTextStyles.BodySmall, color = DarkPastelAnthracite.copy(alpha = 0.45f))
-                            OutlinedTextField(
+                            AppTextField(
                                 value = description,
                                 onValueChange = { description = it },
                                 modifier = Modifier.fillMaxWidth().height(120.dp),
-                                shape = RoundedCornerShape(16.dp),
-                                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = scheme.primary)
+                                singleLine = false
                             )
 
                             Spacer(modifier = Modifier.height(32.dp))
 
-                            Button(
-                                onClick = { savePostToFirebase() },
+                            val canPublish = !isUploading && title.isNotBlank() && description.isNotBlank()
+                            Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .height(56.dp)
+                                    .clip(RoundedCornerShape(16.dp))
                                     .background(
-                                        brush = Brush.horizontalGradient(listOf(Color(0xFF7AE23A), Color(0xFF3BD4C0))),
-                                        shape = RoundedCornerShape(16.dp)
-                                    ),
-                                shape = RoundedCornerShape(16.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = Color.Transparent,
-                                    contentColor = Color.White
-                                ),
-                                enabled = !isUploading && title.isNotBlank() && description.isNotBlank()
+                                        brush = if (canPublish)
+                                            PrimaryGradient
+                                        else
+                                            Brush.horizontalGradient(listOf(SurfaceMuted, SurfaceMuted))
+                                    )
+                                    .clickable(enabled = canPublish) { savePostToFirebase() },
+                                contentAlignment = Alignment.Center
                             ) {
                                 if (isUploading) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
                                 else Text(
@@ -380,7 +402,7 @@ fun AddScreen(
                                     style = AppTextStyles.BodyMedium,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 16.sp,
-                                    color = Color.White
+                                    color = if (canPublish) Color.White else DarkPastelAnthracite.copy(alpha = 0.45f)
                                 )
                             }
                         }
@@ -401,7 +423,7 @@ fun RowScope.CategoryButton(item: CategoryItem, isSelected: Boolean, onClick: (S
             .height(50.dp)
             .then(
                 if (isSelected) Modifier.background(
-                    brush = Brush.horizontalGradient(listOf(Color(0xFF7AE23A), Color(0xFF3BD4C0))),
+                    brush = PrimaryGradient,
                     shape = RoundedCornerShape(16.dp)
                 ) else Modifier
             ),

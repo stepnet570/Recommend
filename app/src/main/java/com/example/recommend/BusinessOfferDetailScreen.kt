@@ -1,6 +1,7 @@
 package com.example.recommend
 
 import com.example.recommend.data.model.*
+import com.example.recommend.ui.theme.*
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*

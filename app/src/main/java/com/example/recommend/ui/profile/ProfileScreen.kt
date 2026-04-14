@@ -1,6 +1,7 @@
 package com.example.recommend.ui.profile
 
 import com.example.recommend.*
+import com.example.recommend.ui.theme.*
 import com.example.recommend.data.model.*
 
 import android.net.Uri
@@ -57,6 +58,8 @@ import com.example.recommend.ui.theme.GradientMid
 import com.example.recommend.ui.theme.GradientTop
 import com.example.recommend.ui.theme.SurfaceMuted
 import com.example.recommend.ui.theme.SurfacePastel
+import com.example.recommend.ui.theme.AppDark
+import com.example.recommend.ui.theme.PrimaryGradient
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
@@ -84,7 +87,9 @@ fun ProfileScreen(
     onCreateCampaign: () -> Unit = {},
     onOfferClick: (AdOffer) -> Unit = {},
     onOfferPauseToggle: (AdOffer) -> Unit = {},
-    onLogout: () -> Unit
+    isViewingOtherUser: Boolean = false,
+    onBack: (() -> Unit)? = null,
+    onLogout: () -> Unit = {}
 ) {
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     var isAvatarUploading by remember { mutableStateOf(false) }
@@ -158,7 +163,7 @@ fun ProfileScreen(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Transparent)
+            .background(Color.White)
             .padding(horizontal = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         contentPadding = PaddingValues(top = 16.dp, bottom = 32.dp)
@@ -182,7 +187,7 @@ fun ProfileScreen(
                             .size(100.dp)
                             .clip(CircleShape)
                             .background(SurfaceMuted)
-                            .clickable(enabled = !isAvatarUploading) {
+                            .clickable(enabled = !isAvatarUploading && !isViewingOtherUser) {
                                 pickAvatar.launch(
                                     PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                                 )
@@ -210,18 +215,20 @@ fun ProfileScreen(
                             }
                         }
                     }
-                    Text(
-                        "Tap photo to change",
-                        style = AppTextStyles.BodySmall,
-                        color = DarkPastelAnthracite.copy(alpha = 0.45f),
-                        fontSize = 11.sp,
-                        modifier = Modifier.padding(top = 6.dp)
-                    )
+                    if (!isViewingOtherUser) {
+                        Text(
+                            "Tap photo to change",
+                            style = AppTextStyles.BodySmall,
+                            color = DarkPastelAnthracite.copy(alpha = 0.45f),
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(top = 6.dp)
+                        )
+                    }
 
                     Spacer(modifier = Modifier.height(10.dp))
 
                     Text(userProfile.name, style = AppTextStyles.Heading2.copy(fontSize = 24.sp))
-                    Text(userProfile.handle, color = Color(0xFF2D3A36), style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Medium)
+                    Text(userProfile.handle, color = DarkPastelAnthracite.copy(alpha = 0.55f), style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Medium)
 
                     Spacer(modifier = Modifier.height(12.dp))
 
@@ -289,27 +296,57 @@ fun ProfileScreen(
                                 textAlign = TextAlign.Center
                             )
 
-                            Spacer(modifier = Modifier.height(20.dp))
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(50.dp)
-                                    .background(
-                                        brush = Brush.horizontalGradient(listOf(Color(0xFF7AE23A), Color(0xFF3BD4C0))),
-                                        shape = RoundedCornerShape(16.dp)
-                                    )
-                                    .padding(1.5.dp)
-                                    .background(Color.White, shape = RoundedCornerShape(16.dp))
-                                    .clickable { onProfileSurfaceChange(1) },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.Center
-                                ) {
-                                    Text("Go to Ads Campaigns", style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold, color = Color(0xFF2D3A36))
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = Color(0xFF2D3A36), modifier = Modifier.size(20.dp))
+                            if (!isViewingOtherUser) {
+                                Spacer(modifier = Modifier.height(20.dp))
+                                if (userProfile.isBusiness) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(50.dp)
+                                            .background(
+                                                brush = PrimaryGradient,
+                                                shape = RoundedCornerShape(16.dp)
+                                            )
+                                            .padding(1.5.dp)
+                                            .background(Color.White, shape = RoundedCornerShape(16.dp))
+                                            .clickable { onProfileSurfaceChange(1) },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.Center
+                                        ) {
+                                            Text("Ad Campaigns", style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold, color = AppDark)
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = AppDark, modifier = Modifier.size(20.dp))
+                                        }
+                                    }
+                                } else {
+                                    OutlinedButton(
+                                        onClick = {
+                                            db.trustListDataRoot()
+                                                .collection("users").document(userProfile.uid)
+                                                .update("isBusiness", true)
+                                                .addOnSuccessListener {
+                                                    Toast.makeText(context, "Ad Studio activated!", Toast.LENGTH_SHORT).show()
+                                                }
+                                                .addOnFailureListener { e ->
+                                                    Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                                                }
+                                        },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(50.dp),
+                                        shape = RoundedCornerShape(16.dp),
+                                        border = BorderStroke(1.5.dp, MutedPastelTeal),
+                                        colors = ButtonDefaults.outlinedButtonColors(
+                                            contentColor = MutedPastelTeal
+                                        )
+                                    ) {
+                                        Icon(Icons.Filled.Campaign, contentDescription = null, tint = MutedPastelTeal, modifier = Modifier.size(18.dp))
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text("Open Ad Studio", style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold, color = MutedPastelTeal)
+                                    }
                                 }
                             }
                         }
@@ -388,7 +425,7 @@ fun ProfileScreen(
                                     .fillMaxWidth()
                                     .height(50.dp)
                                     .background(
-                                        brush = Brush.horizontalGradient(listOf(Color(0xFF7AE23A), Color(0xFF3BD4C0))),
+                                        brush = PrimaryGradient,
                                         shape = RoundedCornerShape(16.dp)
                                     )
                                     .padding(1.5.dp)
@@ -400,9 +437,9 @@ fun ProfileScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.Center
                                 ) {
-                                    Icon(Icons.Filled.Person, contentDescription = null, tint = Color(0xFF2D3A36), modifier = Modifier.size(20.dp))
+                                    Icon(Icons.Filled.Person, contentDescription = null, tint = AppDark, modifier = Modifier.size(20.dp))
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Personal cabinet", style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold, color = Color(0xFF2D3A36))
+                                    Text("Personal cabinet", style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold, color = AppDark)
                                 }
                             }
                         }
@@ -412,29 +449,47 @@ fun ProfileScreen(
                     HorizontalDivider(color = SurfaceMuted)
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(50.dp)
-                            .background(
-                                brush = Brush.horizontalGradient(listOf(Color(0xFF7AE23A), Color(0xFF3BD4C0))),
-                                shape = RoundedCornerShape(16.dp)
-                            )
-                            .padding(1.5.dp)
-                            .background(Color.White, shape = RoundedCornerShape(16.dp))
-                            .clickable {
-                                FirebaseAuth.getInstance().signOut()
-                                onLogout()
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
+                    if (isViewingOtherUser) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(50.dp)
+                                .background(
+                                    brush = PrimaryGradient,
+                                    shape = RoundedCornerShape(16.dp)
+                                )
+                                .padding(1.5.dp)
+                                .background(Color.White, shape = RoundedCornerShape(16.dp))
+                                .clickable { onBack?.invoke() },
+                            contentAlignment = Alignment.Center
                         ) {
-                            Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null, tint = Color(0xFF2D3A36))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Log out", style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Color(0xFF2D3A36))
+                            Text("Back", style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = AppDark)
+                        }
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(50.dp)
+                                .background(
+                                    brush = PrimaryGradient,
+                                    shape = RoundedCornerShape(16.dp)
+                                )
+                                .padding(1.5.dp)
+                                .background(Color.White, shape = RoundedCornerShape(16.dp))
+                                .clickable {
+                                    FirebaseAuth.getInstance().signOut()
+                                    onLogout()
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null, tint = AppDark)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text("Log out", style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = AppDark)
+                            }
                         }
                     }
                 }
@@ -462,6 +517,17 @@ fun ProfileScreen(
                     onCreateCampaign = onCreateCampaign,
                     onOfferClick = onOfferClick,
                     onOfferPauseToggle = onOfferPauseToggle,
+                    onActivateAdStudio = {
+                        db.trustListDataRoot()
+                            .collection("users").document(userProfile.uid)
+                            .update("isBusiness", true)
+                            .addOnSuccessListener {
+                                Toast.makeText(context, "Ad Studio activated!", Toast.LENGTH_SHORT).show()
+                            }
+                            .addOnFailureListener { e ->
+                                Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
+                            }
+                    },
                     isViewerOwner = true
                 )
             }
@@ -475,6 +541,7 @@ internal fun LazyListScope.adsDashboardSection(
     onCreateCampaign: () -> Unit,
     onOfferClick: (AdOffer) -> Unit,
     onOfferPauseToggle: (AdOffer) -> Unit,
+    onActivateAdStudio: () -> Unit = {},
     /** When false, viewing someone else: no new campaign, no pause, read-only list. */
     isViewerOwner: Boolean = true
 ) {
@@ -501,7 +568,7 @@ internal fun LazyListScope.adsDashboardSection(
                     .fillMaxWidth()
                     .height(48.dp)
                     .background(
-                        brush = Brush.horizontalGradient(listOf(Color(0xFF7AE23A), Color(0xFF3BD4C0))),
+                        brush = PrimaryGradient,
                         shape = RoundedCornerShape(16.dp)
                     )
                     .padding(1.5.dp)
@@ -513,19 +580,40 @@ internal fun LazyListScope.adsDashboardSection(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Center
                 ) {
-                    Icon(Icons.Filled.Campaign, contentDescription = null, tint = Color(0xFF2D3A36), modifier = Modifier.size(20.dp))
+                    Icon(Icons.Filled.Campaign, contentDescription = null, tint = AppDark, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("New campaign", style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold, color = Color(0xFF2D3A36))
+                    Text("New campaign", style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold, color = AppDark)
                 }
             }
             Spacer(modifier = Modifier.height(24.dp))
         } else if (isViewerOwner && !isBusiness) {
-            Text(
-                "Business accounts can launch sponsored campaigns from the Ads section.",
-                style = AppTextStyles.BodySmall,
-                color = DarkPastelAnthracite.copy(alpha = 0.5f),
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
+            Spacer(modifier = Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = onActivateAdStudio,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.5.dp, MutedPastelTeal),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MutedPastelTeal
+                )
+            ) {
+                Icon(
+                    Icons.Filled.Campaign,
+                    contentDescription = null,
+                    tint = MutedPastelTeal,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    "Open Ad Studio",
+                    style = AppTextStyles.BodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MutedPastelTeal
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
     val showPause = isViewerOwner && isBusiness
@@ -561,14 +649,14 @@ internal fun LazyListScope.personalRecsAndCollectionsSection(
         TabRow(
             selectedTabIndex = selectedTab,
             containerColor = Color.Transparent,
-            contentColor = Color(0xFF2D3A36),
+            contentColor = AppDark,
             indicator = { tabPositions ->
                 Box(
                     Modifier
                         .tabIndicatorOffset(tabPositions[selectedTab])
                         .height(3.dp)
                         .background(
-                            brush = Brush.horizontalGradient(listOf(Color(0xFF7AE23A), Color(0xFF3BD4C0))),
+                            brush = PrimaryGradient,
                             shape = RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp)
                         )
                 )
@@ -678,7 +766,7 @@ fun AdOfferProfileCard(
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                             style = AppTextStyles.BodySmall,
                             fontWeight = FontWeight.SemiBold,
-                            color = Color(0xFF2D3A36)
+                            color = AppDark
                         )
                     }
                 }
@@ -705,7 +793,7 @@ fun AdOfferProfileCard(
                                 "${offer.rewardCoins}",
                                 style = AppTextStyles.Heading2.copy(fontSize = 20.sp),
                                 fontWeight = FontWeight.Bold,
-                                color = Color(0xFF2D3A36)
+                                color = AppDark
                             )
                         }
                         Text(

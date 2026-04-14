@@ -1,9 +1,11 @@
 package com.example.recommend
 
 import com.example.recommend.data.model.*
+import com.example.recommend.ui.theme.*
 
 import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.rememberScrollState
@@ -19,8 +21,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.recommend.ui.theme.AppTextStyles
@@ -30,6 +35,8 @@ import com.example.recommend.ui.theme.MutedPastelTeal
 import com.example.recommend.ui.theme.RichPastelCoral
 import com.example.recommend.ui.theme.SoftPastelMint
 import com.example.recommend.ui.theme.SurfaceMuted
+import com.example.recommend.ui.theme.AppDark
+import com.example.recommend.ui.theme.PrimaryGradient
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 
@@ -44,6 +51,8 @@ fun CreateOfferScreen(
     var description by remember { mutableStateOf("") }
     var rewardCoinsText by remember { mutableStateOf("") }
     var minTrustScore by remember { mutableFloatStateOf(0f) }
+    var selectedDurationDays by remember { mutableIntStateOf(7) }
+    var maxAcceptancesText by remember { mutableStateOf("") }
     var isSubmitting by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
@@ -67,10 +76,16 @@ fun CreateOfferScreen(
             Toast.makeText(context, "Enter a valid reward (TrustCoins)", Toast.LENGTH_SHORT).show()
             return
         }
+        val maxAcceptances = maxAcceptancesText.trim().toIntOrNull()
+        if (maxAcceptances == null || maxAcceptances <= 0) {
+            Toast.makeText(context, "Enter how many people can accept this offer", Toast.LENGTH_SHORT).show()
+            return
+        }
 
         val uid = auth.currentUser?.uid ?: return
         isSubmitting = true
 
+        val now = System.currentTimeMillis()
         val data = hashMapOf(
             "businessId" to uid,
             "businessName" to userProfile.name.ifBlank { userProfile.handle },
@@ -79,7 +94,12 @@ fun CreateOfferScreen(
             "rewardCoins" to coins,
             "minTrustScore" to minTrustScore.toDouble(),
             "status" to "active",
-            "createdAt" to System.currentTimeMillis()
+            "createdAt" to now,
+            "durationDays" to selectedDurationDays,
+            "expiresAt" to (now + selectedDurationDays * 86_400_000L),
+            "maxAcceptances" to maxAcceptances,
+            "acceptedCount" to 0,
+            "acceptedBy" to emptyList<String>()
         )
 
         db.trustListDataRoot()
@@ -97,7 +117,7 @@ fun CreateOfferScreen(
     }
 
     Scaffold(
-        containerColor = SoftPastelMint,
+        containerColor = Color.White,
         topBar = {
             CenterAlignedTopAppBar(
                 navigationIcon = {
@@ -120,8 +140,8 @@ fun CreateOfferScreen(
                     )
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = SoftPastelMint,
-                    scrolledContainerColor = SoftPastelMint,
+                    containerColor = Color.White,
+                    scrolledContainerColor = Color.White,
                     titleContentColor = DarkPastelAnthracite,
                     navigationIconContentColor = MutedPastelTeal
                 )
@@ -155,7 +175,7 @@ fun CreateOfferScreen(
                     Icon(
                         Icons.Filled.Campaign,
                         contentDescription = null,
-                        tint = RichPastelCoral,
+                        tint = AppDark,
                         modifier = Modifier.size(36.dp)
                     )
                     Spacer(modifier = Modifier.width(16.dp))
@@ -183,18 +203,12 @@ fun CreateOfferScreen(
                         fontWeight = FontWeight.SemiBold
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
+                    AppTextField(
                         value = title,
                         onValueChange = { title = it },
                         modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("Summer trust drop") },
-                        singleLine = true,
-                        shape = RoundedCornerShape(16.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MutedPastelTeal,
-                            unfocusedBorderColor = SurfaceMuted,
-                            focusedLabelColor = MutedPastelTeal
-                        )
+                        placeholder = "Summer trust drop",
+                        singleLine = true
                     )
 
                     Spacer(modifier = Modifier.height(20.dp))
@@ -206,19 +220,15 @@ fun CreateOfferScreen(
                         fontWeight = FontWeight.SemiBold
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
+                    AppTextField(
                         value = description,
                         onValueChange = { description = it },
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(min = 120.dp),
-                        placeholder = { Text("Visit our café, leave an honest review, show this screen…") },
-                        minLines = 4,
-                        shape = RoundedCornerShape(16.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MutedPastelTeal,
-                            unfocusedBorderColor = SurfaceMuted
-                        )
+                        placeholder = "Visit our café, leave an honest review, show this screen…",
+                        singleLine = false,
+                        minLines = 4
                     )
 
                     Spacer(modifier = Modifier.height(20.dp))
@@ -230,18 +240,13 @@ fun CreateOfferScreen(
                         fontWeight = FontWeight.SemiBold
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
+                    AppTextField(
                         value = rewardCoinsText,
                         onValueChange = { if (it.all { c -> c.isDigit() } || it.isEmpty()) rewardCoinsText = it },
                         modifier = Modifier.fillMaxWidth(),
-                        placeholder = { Text("e.g. 50") },
+                        placeholder = "e.g. 50",
                         singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MutedPastelGold,
-                            unfocusedBorderColor = SurfaceMuted
-                        )
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                     )
 
                     Spacer(modifier = Modifier.height(24.dp))
@@ -258,23 +263,104 @@ fun CreateOfferScreen(
                         color = DarkPastelAnthracite.copy(alpha = 0.45f)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    Slider(
+                    AppSlider(
                         value = minTrustScore,
                         onValueChange = { minTrustScore = it },
                         valueRange = 0f..5f,
                         steps = 10,
-                        colors = SliderDefaults.colors(
-                            thumbColor = RichPastelCoral,
-                            activeTrackColor = RichPastelCoral,
-                            inactiveTrackColor = SurfaceMuted
-                        )
+                        modifier = Modifier.fillMaxWidth()
                     )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text("0", style = AppTextStyles.BodySmall, color = Color(0xFF2D3A36))
-                        Text("5", style = AppTextStyles.BodySmall, color = Color(0xFF2D3A36))
+                        Text("0", style = AppTextStyles.BodySmall, color = AppDark)
+                        Text("5", style = AppTextStyles.BodySmall, color = AppDark)
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    Text(
+                        "Campaign duration",
+                        style = AppTextStyles.BodySmall,
+                        color = DarkPastelAnthracite.copy(alpha = 0.65f),
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    val durations = listOf(7, 14, 30)
+                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        durations.forEachIndexed { index, days ->
+                            SegmentedButton(
+                                selected = selectedDurationDays == days,
+                                onClick = { selectedDurationDays = days },
+                                shape = SegmentedButtonDefaults.itemShape(
+                                    index = index,
+                                    count = durations.size
+                                ),
+                                colors = SegmentedButtonDefaults.colors(
+                                    activeContainerColor = MutedPastelGold.copy(alpha = 0.18f),
+                                    activeContentColor = MutedPastelGold,
+                                    activeBorderColor = MutedPastelGold,
+                                    inactiveContainerColor = Color.Transparent,
+                                    inactiveContentColor = DarkPastelAnthracite.copy(alpha = 0.6f),
+                                    inactiveBorderColor = SurfaceMuted
+                                )
+                            ) {
+                                Text(
+                                    "$days days",
+                                    fontWeight = if (selectedDurationDays == days) FontWeight.Bold else FontWeight.Normal
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    Text(
+                        "Max acceptances",
+                        style = AppTextStyles.BodySmall,
+                        color = DarkPastelAnthracite.copy(alpha = 0.65f),
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    AppTextField(
+                        value = maxAcceptancesText,
+                        onValueChange = { if (it.all { c -> c.isDigit() } || it.isEmpty()) maxAcceptancesText = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = "e.g. 20",
+                        singleLine = true,
+                        suffix = { Text("people", color = DarkPastelAnthracite.copy(alpha = 0.45f)) },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                    )
+
+                    val maxPeople = maxAcceptancesText.toIntOrNull() ?: 0
+                    if (selectedDurationDays > 0 || maxPeople > 0) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .border(1.5.dp, MutedPastelGold.copy(alpha = 0.5f), RoundedCornerShape(14.dp)),
+                            color = MutedPastelGold.copy(alpha = 0.07f),
+                            shape = RoundedCornerShape(14.dp)
+                        ) {
+                            Text(
+                                text = buildAnnotatedString {
+                                    append("This offer runs for ")
+                                    withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = MutedPastelGold)) {
+                                        append("$selectedDurationDays days")
+                                    }
+                                    if (maxPeople > 0) {
+                                        append(" or until ")
+                                        withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = MutedPastelGold)) {
+                                            append("$maxPeople people")
+                                        }
+                                        append(" complete it")
+                                    }
+                                },
+                                style = AppTextStyles.BodySmall,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(28.dp))
@@ -286,7 +372,7 @@ fun CreateOfferScreen(
                             .fillMaxWidth()
                             .height(54.dp)
                             .background(
-                                brush = Brush.horizontalGradient(listOf(Color(0xFF7AE23A), Color(0xFF3BD4C0))),
+                                brush = PrimaryGradient,
                                 shape = RoundedCornerShape(16.dp)
                             ),
                         shape = RoundedCornerShape(16.dp),

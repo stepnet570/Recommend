@@ -1,6 +1,7 @@
 package com.example.recommend.ui.theme
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 
-val PrimaryGradient = Brush.horizontalGradient(listOf(Color(0xFF7AE23A), Color(0xFF3BD4C0)))
-val PrimaryGradientVert = Brush.verticalGradient(listOf(Color(0xFF7AE23A), Color(0xFF3BD4C0)))
+val PrimaryGradient = Brush.horizontalGradient(listOf(AppLime, AppTeal))
+val PrimaryGradientVert = Brush.verticalGradient(listOf(AppLime, AppTeal))
+val PrimaryGradientLinear = Brush.linearGradient(listOf(AppLime, AppTeal))
+val DisabledGradient = Brush.linearGradient(listOf(AppDisabled, AppDisabled))

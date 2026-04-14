@@ -44,7 +44,7 @@ fun DocumentSnapshot.toPostFromDoc(): Post {
         imageUrl = getString("imageUrl"),
         authorName = getString("authorName") ?: "User",
         authorHandle = getString("authorHandle") ?: "@user",
-        isSponsored = getBoolean("sponsored") == true,
+        isSponsored = getBoolean("isSponsored") ?: false,
         ratingsByUser = ratingsByUser,
         likesByUser = likesByUser,
         replyToRequestId = replyToRequestId?.takeIf { it.isNotBlank() },

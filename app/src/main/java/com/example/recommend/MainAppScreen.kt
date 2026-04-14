@@ -1,17 +1,20 @@
 package com.example.recommend
 
 import androidx.compose.foundation.background
+import com.example.recommend.ui.theme.*
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
@@ -21,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -29,9 +33,14 @@ import androidx.navigation.compose.rememberNavController
 import com.example.recommend.navigation.AppNavigation
 import com.example.recommend.ui.feed.FeedViewModel
 import com.example.recommend.ui.profile.ProfileViewModel
-import com.example.recommend.ui.theme.MutedPastelTeal
-import com.example.recommend.ui.theme.RichPastelCoral
-import com.example.recommend.ui.theme.SurfaceMuted
+import com.example.recommend.ui.theme.AppTextStyles
+import com.example.recommend.ui.theme.DarkPastelAnthracite
+import com.example.recommend.ui.theme.AppLime
+import com.example.recommend.ui.theme.AppTeal
+import com.example.recommend.ui.theme.AppDark
+import com.example.recommend.ui.theme.AppMuted
+import com.example.recommend.ui.theme.PrimaryGradient
+import com.example.recommend.ui.theme.PrimaryGradientLinear
 
 @Composable
 fun MainAppScreen(onLogout: () -> Unit) {
@@ -59,6 +68,39 @@ fun MainAppScreen(onLogout: () -> Unit) {
         remember { derivedStateOf { entry.value?.destination?.route } }
     }
 
+    // Overlay + creation-flow state lifted from AppNavigation so MainAppScreen can react
+    var isAskModalOpen by remember { mutableStateOf(false) }
+
+    // Прямая функция сброса — регистрируется из AppNavigation синхронно через SideEffect
+    var resetOverlaysFn by remember { mutableStateOf<() -> Unit>({}) }
+
+    // Dialog state for navigating away from a creation flow
+    var pendingTab by remember { mutableStateOf<String?>(null) }
+    var showExitCreationDialog by remember { mutableStateOf(false) }
+
+    // true только когда пользователь реально заполняет форму (не на экране выбора Hub)
+    var isActuallyCreating by remember { mutableStateOf(false) }
+    val isInCreationFlow = isAskModalOpen || isActuallyCreating
+
+    fun navigateTo(route: String) {
+        navController.navigate(route) {
+            launchSingleTop = true
+            popUpTo(navController.graph.startDestinationId) { saveState = false }
+        }
+    }
+
+    fun onNavItemClick(targetRoute: String) {
+        // Если в процессе создания и переходим на другой таб — предупреждаем
+        if (isInCreationFlow && currentRoute != targetRoute) {
+            pendingTab = targetRoute
+            showExitCreationDialog = true
+            return
+        }
+        // Синхронный сброс всех оверлеев ДО навигации — нет мерцания
+        resetOverlaysFn()
+        navigateTo(targetRoute)
+    }
+
     Scaffold(
         containerColor = Color.White,
         bottomBar = {
@@ -73,7 +115,7 @@ fun MainAppScreen(onLogout: () -> Unit) {
                                     .size(24.dp)
                                     .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
                                     .drawWithCache {
-                                        val gradient = Brush.horizontalGradient(listOf(Color(0xFF7AE23A), Color(0xFF3BD4C0)))
+                                        val gradient = PrimaryGradient
                                         onDrawWithContent {
                                             drawContent()
                                             drawRect(gradient, blendMode = BlendMode.SrcIn)
@@ -83,8 +125,12 @@ fun MainAppScreen(onLogout: () -> Unit) {
                         )
                     },
                     selected = currentRoute == "feed",
-                    onClick = { navController.navigate("feed") { launchSingleTop = true } },
-                    colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF3BD4C0), indicatorColor = Color(0xFF7AE23A).copy(alpha = 0.15f), unselectedIconColor = Color(0xFF2D3A36).copy(alpha = 0.4f))
+                    onClick = { onNavItemClick("feed") },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = AppTeal,
+                        indicatorColor = AppLime.copy(alpha = 0.15f),
+                        unselectedIconColor = AppDark.copy(alpha = 0.4f)
+                    )
                 )
                 NavigationBarItem(
                     icon = {
@@ -96,7 +142,7 @@ fun MainAppScreen(onLogout: () -> Unit) {
                                     .size(24.dp)
                                     .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
                                     .drawWithCache {
-                                        val gradient = Brush.horizontalGradient(listOf(Color(0xFF7AE23A), Color(0xFF3BD4C0)))
+                                        val gradient = PrimaryGradient
                                         onDrawWithContent {
                                             drawContent()
                                             drawRect(gradient, blendMode = BlendMode.SrcIn)
@@ -106,8 +152,12 @@ fun MainAppScreen(onLogout: () -> Unit) {
                         )
                     },
                     selected = currentRoute == "explore",
-                    onClick = { navController.navigate("explore") { launchSingleTop = true } },
-                    colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF3BD4C0), indicatorColor = Color(0xFF7AE23A).copy(alpha = 0.15f), unselectedIconColor = Color(0xFF2D3A36).copy(alpha = 0.4f))
+                    onClick = { onNavItemClick("explore") },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = AppTeal,
+                        indicatorColor = AppLime.copy(alpha = 0.15f),
+                        unselectedIconColor = AppDark.copy(alpha = 0.4f)
+                    )
                 )
                 NavigationBarItem(
                     icon = {
@@ -115,9 +165,7 @@ fun MainAppScreen(onLogout: () -> Unit) {
                             modifier = Modifier
                                 .size(48.dp)
                                 .background(
-                                    brush = Brush.horizontalGradient(
-                                        listOf(Color(0xFF7AE23A), Color(0xFF3BD4C0))
-                                    ),
+                                    brush = PrimaryGradient,
                                     shape = CircleShape
                                 ),
                             contentAlignment = Alignment.Center
@@ -126,7 +174,7 @@ fun MainAppScreen(onLogout: () -> Unit) {
                         }
                     },
                     selected = currentRoute == "add",
-                    onClick = { navController.navigate("add") { launchSingleTop = true } },
+                    onClick = { onNavItemClick("add") },
                     colors = NavigationBarItemDefaults.colors(indicatorColor = Color.Transparent)
                 )
                 NavigationBarItem(
@@ -139,7 +187,7 @@ fun MainAppScreen(onLogout: () -> Unit) {
                                     .size(24.dp)
                                     .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
                                     .drawWithCache {
-                                        val gradient = Brush.horizontalGradient(listOf(Color(0xFF7AE23A), Color(0xFF3BD4C0)))
+                                        val gradient = PrimaryGradient
                                         onDrawWithContent {
                                             drawContent()
                                             drawRect(gradient, blendMode = BlendMode.SrcIn)
@@ -149,8 +197,12 @@ fun MainAppScreen(onLogout: () -> Unit) {
                         )
                     },
                     selected = currentRoute == "profile",
-                    onClick = { navController.navigate("profile") { launchSingleTop = true } },
-                    colors = NavigationBarItemDefaults.colors(selectedIconColor = Color(0xFF3BD4C0), indicatorColor = Color(0xFF7AE23A).copy(alpha = 0.15f), unselectedIconColor = Color(0xFF2D3A36).copy(alpha = 0.4f))
+                    onClick = { onNavItemClick("profile") },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = AppTeal,
+                        indicatorColor = AppLime.copy(alpha = 0.15f),
+                        unselectedIconColor = AppDark.copy(alpha = 0.4f)
+                    )
                 )
             }
         }
@@ -172,7 +224,57 @@ fun MainAppScreen(onLogout: () -> Unit) {
             myOffers = myOffers,
             followersCount = followersCount,
             participatingPromoCampaignsCount = participatingCount,
+            isAskModalOpen = isAskModalOpen,
+            onAskModalOpenChange = { isAskModalOpen = it },
+            onRegisterReset = { resetOverlaysFn = it },
+            onCreationFlowActive = { isActuallyCreating = it },
             onLogout = onLogout
+        )
+    }
+
+    if (showExitCreationDialog && pendingTab != null) {
+        AlertDialog(
+            onDismissRequest = {
+                showExitCreationDialog = false
+                pendingTab = null
+            },
+            title = {
+                Text("Leave this screen?", style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Text(
+                    "Your progress will be lost.",
+                    style = AppTextStyles.BodySmall,
+                    color = DarkPastelAnthracite.copy(alpha = 0.7f)
+                )
+            },
+            confirmButton = {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(PrimaryGradientLinear)
+                        .clickable {
+                            val target = pendingTab!!
+                            pendingTab = null
+                            showExitCreationDialog = false
+                            resetOverlaysFn()
+                            navigateTo(target)
+                        }
+                        .padding(horizontal = 20.dp, vertical = 10.dp)
+                ) {
+                    Text("Leave", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showExitCreationDialog = false
+                    pendingTab = null
+                }) {
+                    Text("Stay", color = AppMuted)
+                }
+            },
+            shape = RoundedCornerShape(24.dp),
+            containerColor = Color.White
         )
     }
 }

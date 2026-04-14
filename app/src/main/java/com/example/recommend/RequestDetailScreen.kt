@@ -1,5 +1,6 @@
 package com.example.recommend
 import com.example.recommend.ui.feed.*
+import com.example.recommend.ui.theme.*
 
 import com.example.recommend.data.model.*
 
@@ -24,7 +25,6 @@ import com.example.recommend.ui.theme.AppTextStyles
 import com.example.recommend.ui.theme.BodyFontFamily
 import com.example.recommend.ui.theme.DarkPastelAnthracite
 import com.example.recommend.ui.theme.MutedPastelTeal
-import com.example.recommend.ui.theme.SoftPastelMint
 import com.example.recommend.ui.theme.SurfaceMuted
 import com.example.recommend.ui.theme.PrimaryGradient
 import com.google.firebase.firestore.FirebaseFirestore
@@ -73,7 +73,7 @@ fun RequestDetailScreen(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = SoftPastelMint,
+        containerColor = Color.White,
         topBar = {
             Surface(color = Color.White, shadowElevation = 2.dp) {
                 Row(
@@ -128,29 +128,23 @@ fun RequestDetailScreen(
             }
         },
         bottomBar = {
-            Surface(
-                modifier = Modifier.navigationBarsPadding(),
-                color = Color.White,
-                tonalElevation = 4.dp,
-                shadowElevation = 10.dp
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .height(54.dp)
+                    .background(brush = PrimaryGradient, shape = RoundedCornerShape(16.dp))
+                    .clickable { onAddRecommendation() },
+                contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
-                        .height(54.dp)
-                        .background(brush = PrimaryGradient, shape = RoundedCornerShape(16.dp))
-                        .clickable { onAddRecommendation() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "Add a pick",
-                        fontFamily = BodyFontFamily,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                        color = Color(0xFF1A2A24)
-                    )
-                }
+                Text(
+                    text = "Add a pick",
+                    fontFamily = BodyFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = Color.White
+                )
             }
         }
     ) { paddingValues ->

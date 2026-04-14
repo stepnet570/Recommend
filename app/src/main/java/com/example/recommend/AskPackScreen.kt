@@ -1,15 +1,16 @@
 package com.example.recommend
 
 import com.example.recommend.data.model.*
+import com.example.recommend.ui.theme.*
 
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ExperimentalAnimationApi
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -35,11 +36,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.recommend.ui.theme.AppTextStyles
+import com.example.recommend.ui.theme.ConvexCardBox
 import com.example.recommend.ui.theme.DarkPastelAnthracite
 import com.example.recommend.ui.theme.MutedPastelTeal
 import com.example.recommend.ui.theme.RichPastelCoral
-import com.example.recommend.ui.theme.SoftPastelMint
 import com.example.recommend.ui.theme.SurfaceMuted
+import com.example.recommend.ui.theme.AppTeal
+import com.example.recommend.ui.theme.AppLime
+import com.example.recommend.ui.theme.PrimaryGradientLinear
+import com.example.recommend.ui.theme.DisabledGradient
+import com.example.recommend.ui.theme.AppOnDisabled
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 
@@ -61,7 +67,6 @@ fun AskPackScreen(
     val context = LocalContext.current
     val db = FirebaseFirestore.getInstance()
     val auth = FirebaseAuth.getInstance()
-    val scheme = MaterialTheme.colorScheme
 
     val availableTags = listOf("🍔 Eat", "🍷 Drink", "🆘 Urgent", "📅 Date", "🔧 Services", "🎉 Party")
 
@@ -105,7 +110,7 @@ fun AskPackScreen(
 
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = SoftPastelMint
+        color = Color.White
     ) {
         Column(
             modifier = Modifier
@@ -119,12 +124,12 @@ fun AskPackScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = { if (step == 2) step = 1 else onDismiss() }) {
+                IconButton(onClick = { onDismiss() }) {
                     Icon(Icons.Filled.Close, contentDescription = "Close", tint = MutedPastelTeal)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Box(modifier = Modifier.height(6.dp).width(if (step >= 1) 24.dp else 8.dp).clip(CircleShape).background(if (step >= 1) RichPastelCoral else SurfaceMuted))
-                    Box(modifier = Modifier.height(6.dp).width(if (step >= 2) 24.dp else 8.dp).clip(CircleShape).background(if (step >= 2) RichPastelCoral else SurfaceMuted))
+                    Box(modifier = Modifier.height(6.dp).width(if (step >= 1) 24.dp else 8.dp).clip(CircleShape).background(if (step >= 1) AppTeal else SurfaceMuted))
+                    Box(modifier = Modifier.height(6.dp).width(if (step >= 2) 24.dp else 8.dp).clip(CircleShape).background(if (step >= 2) AppTeal else SurfaceMuted))
                 }
                 Spacer(modifier = Modifier.width(48.dp))
             }
@@ -155,12 +160,10 @@ fun AskPackScreen(
 
                                 Spacer(modifier = Modifier.height(24.dp))
 
-                                Card(
-                                    shape = RoundedCornerShape(24.dp),
-                                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                                    border = BorderStroke(1.dp, SurfaceMuted),
+                                ConvexCardBox(
                                     modifier = Modifier.fillMaxWidth(),
-                                    elevation = CardDefaults.cardElevation(defaultElevation = 10.dp)
+                                    shape = RoundedCornerShape(24.dp),
+                                    elevation = 20.dp
                                 ) {
                                     Column(modifier = Modifier.padding(20.dp)) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -182,14 +185,19 @@ fun AskPackScreen(
                                                 Box(
                                                     modifier = Modifier
                                                         .clip(RoundedCornerShape(32.dp))
-                                                        .background(if (isSelected) scheme.primary else Color.White)
+                                                        .background(
+                                                            if (isSelected)
+                                                                PrimaryGradientLinear
+                                                            else
+                                                                Brush.linearGradient(listOf(Color.White, Color.White))
+                                                        )
                                                         .border(1.dp, if (isSelected) Color.Transparent else SurfaceMuted, RoundedCornerShape(32.dp))
                                                         .clickable { selectedTags = if (isSelected) selectedTags - tag else selectedTags + tag }
                                                         .padding(horizontal = 16.dp, vertical = 10.dp)
                                                 ) {
                                                     Text(
                                                         tag,
-                                                        color = if (isSelected) scheme.onPrimary else DarkPastelAnthracite,
+                                                        color = if (isSelected) Color.White else DarkPastelAnthracite,
                                                         fontWeight = FontWeight.Bold,
                                                         fontSize = 13.sp
                                                     )
@@ -210,19 +218,26 @@ fun AskPackScreen(
                                 Spacer(modifier = Modifier.height(24.dp))
                             }
 
-                            Button(
-                                onClick = { step = 2 },
-                                enabled = text.isNotBlank(),
+                            Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(top = 8.dp, bottom = 32.dp)
-                                    .height(56.dp),
-                                shape = RoundedCornerShape(32.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = scheme.primary, contentColor = scheme.onPrimary)
+                                    .height(56.dp)
+                                    .clip(RoundedCornerShape(32.dp))
+                                    .background(
+                                        if (text.isNotBlank())
+                                            PrimaryGradientLinear
+                                        else
+                                            DisabledGradient
+                                    )
+                                    .clickable(enabled = text.isNotBlank()) { step = 2 },
+                                contentAlignment = Alignment.Center
                             ) {
-                                Text("Next", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = scheme.onPrimary)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = scheme.onPrimary)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text("Next", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = if (text.isNotBlank()) Color.White else AppOnDisabled)
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = if (text.isNotBlank()) Color.White else AppOnDisabled)
+                                }
                             }
                         }
                     }
@@ -259,8 +274,15 @@ fun AskPackScreen(
                                             Row(
                                                 modifier = Modifier
                                                     .fillMaxWidth()
-                                                    .background(if (isSelected) SurfaceMuted else Color.White, RoundedCornerShape(24.dp))
-                                                    .border(1.dp, if (isSelected) MutedPastelTeal.copy(alpha = 0.45f) else SurfaceMuted, RoundedCornerShape(24.dp))
+                                                    .background(Color.White, RoundedCornerShape(24.dp))
+                                                    .border(
+                                                        width = if (isSelected) 1.5.dp else 1.dp,
+                                                        brush = if (isSelected)
+                                                            PrimaryGradientLinear
+                                                        else
+                                                            DisabledGradient,
+                                                        shape = RoundedCornerShape(24.dp)
+                                                    )
                                                     .clickable { selectedUsers = if (isSelected) selectedUsers - friend.uid else selectedUsers + friend.uid }
                                                     .padding(16.dp),
                                                 verticalAlignment = Alignment.CenterVertically,
@@ -281,7 +303,12 @@ fun AskPackScreen(
 
                                                 Box(
                                                     modifier = Modifier.size(24.dp).clip(CircleShape)
-                                                        .background(if (isSelected) scheme.primary else Color.Transparent)
+                                                        .background(
+                                                            if (isSelected)
+                                                                PrimaryGradientLinear
+                                                            else
+                                                                Brush.linearGradient(listOf(Color.Transparent, Color.Transparent))
+                                                        )
                                                         .border(2.dp, if (isSelected) Color.Transparent else SurfaceMuted, CircleShape),
                                                     contentAlignment = Alignment.Center
                                                 ) {
@@ -293,20 +320,20 @@ fun AskPackScreen(
                                 }
                             }
 
-                            Button(
-                                onClick = { submitRequest() },
-                                enabled = selectedUsers.isNotEmpty() && !isSubmitting,
+                            Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(top = 8.dp, bottom = 32.dp)
-                                    .height(56.dp),
-                                shape = RoundedCornerShape(32.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = scheme.primary, contentColor = scheme.onPrimary)
+                                    .padding(vertical = 16.dp)
+                                    .height(56.dp)
+                                    .clip(RoundedCornerShape(32.dp))
+                                    .background(PrimaryGradientLinear)
+                                    .clickable(enabled = !isSubmitting) { submitRequest() },
+                                contentAlignment = Alignment.Center
                             ) {
                                 if (isSubmitting) {
                                     CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
                                 } else {
-                                    Text("Send signal", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = scheme.onPrimary)
+                                    Text("Send signal", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
                                 }
                             }
                         }

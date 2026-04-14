@@ -1,0 +1,1607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TrustList — All Screens Concept</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --teal:    #3BD4C0;
+  --violet:  #7C6FE0;
+  --bg:      #F8F7F4;
+  --card:    #FFFFFF;
+  --dark:    #1A2A24;
+  --muted:   #8A9A95;
+  --gold:    #D4AF37;
+  --surf:    #F0EEEB;
+  --border:  rgba(59,212,192,0.15);
+  --grad:    linear-gradient(135deg, #7C6FE0, #3BD4C0);
+  --grad-h:  linear-gradient(90deg, #7C6FE0, #3BD4C0);
+  --shadow:  0 2px 16px rgba(26,42,36,0.08);
+  --shadow-md: 0 6px 28px rgba(26,42,36,0.12);
+}
+
+body {
+  background: #D8D5CE;
+  font-family: 'DM Sans', sans-serif;
+  padding: 48px 32px;
+}
+
+h1.page-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 28px;
+  font-weight: 800;
+  color: #1A2A24;
+  margin-bottom: 6px;
+}
+p.page-sub {
+  font-size: 14px;
+  color: #8A9A95;
+  margin-bottom: 48px;
+}
+
+.section-label {
+  font-family: 'Syne', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: #8A9A95;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin: 48px 0 20px;
+}
+.section-label:first-of-type { margin-top: 0; }
+
+.phones-row {
+  display: flex;
+  gap: 32px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+/* ── Phone Frame ── */
+.phone {
+  width: 375px;
+  min-height: 812px;
+  background: var(--bg);
+  border-radius: 48px;
+  overflow: hidden;
+  box-shadow: 0 32px 80px rgba(0,0,0,0.24), 0 0 0 8px rgba(255,255,255,0.1);
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.phone-label {
+  font-family: 'Syne', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--dark);
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.status-bar {
+  background: var(--bg);
+  padding: 14px 28px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dark);
+  flex-shrink: 0;
+}
+
+/* ── Shared components ── */
+.grad-btn {
+  background: var(--grad);
+  border-radius: 32px;
+  padding: 16px;
+  color: white;
+  font-family: 'Syne', sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  text-align: center;
+  cursor: pointer;
+}
+.grad-btn.sm {
+  padding: 10px 20px;
+  font-size: 14px;
+  border-radius: 16px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 20px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.pill-violet { background: rgba(124,111,224,0.1); color: var(--violet); }
+.pill-gold { background: rgba(212,175,55,0.12); color: var(--gold); }
+.pill-teal { background: rgba(59,212,192,0.1); color: #2BA899; }
+.pill-white { background: rgba(255,255,255,0.22); color: white; font-size: 11px; }
+
+.trust-ring-svg { display: block; }
+
+/* Bottom nav */
+.bottom-nav {
+  position: sticky;
+  bottom: 0;
+  background: var(--card);
+  padding: 12px 0 28px;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  box-shadow: 0 -1px 0 rgba(0,0,0,0.06);
+  flex-shrink: 0;
+  z-index: 10;
+}
+.nav-item { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.nav-icon { font-size: 22px; opacity: 0.3; }
+.nav-icon.active { opacity: 1; }
+.nav-label { font-size: 10px; color: var(--muted); font-weight: 500; }
+.nav-label.active { font-weight: 700; background: var(--grad-h); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.nav-fab {
+  width: 52px; height: 52px; border-radius: 50%;
+  background: var(--grad);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px; color: white;
+  box-shadow: 0 4px 16px rgba(124,111,224,0.4);
+  margin-top: -20px;
+}
+
+.screen-content {
+  flex: 1;
+  overflow: hidden;
+}
+
+/* ── 1. AUTH ── */
+.auth-bg {
+  flex: 1;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.auth-card {
+  background: white;
+  border-radius: 32px;
+  padding: 32px 28px;
+  box-shadow: var(--shadow-md);
+  width: 100%;
+}
+.auth-logo {
+  width: 64px; height: 64px;
+  background: var(--grad);
+  border-radius: 18px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px; margin: 0 auto 20px;
+}
+.auth-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 22px; font-weight: 800;
+  color: var(--dark);
+  text-align: center;
+}
+.auth-sub {
+  font-size: 14px; color: var(--muted);
+  text-align: center;
+  margin: 6px 0 24px;
+}
+.input-wrap {
+  background: var(--bg);
+  border: 1.5px solid #E8E6E0;
+  border-radius: 16px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.input-wrap.focused {
+  border-color: transparent;
+  outline: 2px solid;
+  outline-color: var(--violet);
+  background: white;
+}
+.input-icon { font-size: 18px; opacity: 0.5; }
+.input-text { font-size: 15px; color: var(--dark); font-family: 'DM Sans', sans-serif; }
+.input-placeholder { font-size: 15px; color: var(--muted); font-family: 'DM Sans', sans-serif; }
+.auth-toggle { font-size: 14px; color: var(--muted); text-align: center; margin-top: 16px; }
+.auth-toggle span { color: var(--violet); font-weight: 600; }
+
+/* ── 2. FEED ── */
+.top-nav {
+  background: var(--bg);
+  padding: 12px 20px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.greeting-sub { font-size: 12px; color: var(--muted); }
+.greeting-name {
+  font-family: 'Syne', sans-serif;
+  font-size: 20px; font-weight: 700;
+  background: var(--grad-h);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.coins-chip {
+  background: rgba(212,175,55,0.12);
+  border-radius: 20px;
+  padding: 6px 12px;
+  display: flex; align-items: center; gap: 6px;
+  font-size: 14px; font-weight: 700;
+  color: var(--gold);
+}
+.search-bar {
+  margin: 0 20px 16px;
+  background: white;
+  border-radius: 14px;
+  padding: 12px 16px;
+  display: flex; align-items: center; gap: 10px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+}
+.search-bar span { font-size: 14px; color: var(--muted); }
+
+.section-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0 20px;
+  margin-bottom: 12px;
+}
+.section-title { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700; color: var(--dark); }
+.see-all { font-size: 12px; font-weight: 600; color: var(--teal); }
+
+/* Pack pulse */
+.pack-scroll { display: flex; gap: 14px; padding: 0 20px 16px; overflow-x: auto; }
+.pack-scroll::-webkit-scrollbar { display: none; }
+.pack-item { display: flex; flex-direction: column; align-items: center; gap: 6px; flex-shrink: 0; }
+.pack-ring {
+  width: 56px; height: 56px; border-radius: 50%;
+  background: var(--grad);
+  padding: 2.5px;
+  display: flex; align-items: center; justify-content: center;
+}
+.pack-ring.muted { background: #DDD8D0; }
+.pack-inner {
+  width: 100%; height: 100%; border-radius: 50%;
+  background: white;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px;
+  border: 2px solid var(--bg);
+}
+.pack-name { font-size: 11px; color: var(--dark); font-weight: 500; }
+
+/* Feed cards */
+.feed { padding: 0 16px; display: flex; flex-direction: column; gap: 12px; padding-bottom: 16px; }
+
+.post-card {
+  background: white;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  border: 1px solid rgba(0,0,0,0.04);
+}
+.post-img {
+  height: 160px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 52px;
+  position: relative;
+}
+.img-coffee { background: linear-gradient(135deg, #F5E6D3, #EDD5B3); }
+.img-food   { background: linear-gradient(135deg, #E8F5E9, #C8E6C9); }
+.img-place  { background: linear-gradient(135deg, #E3F2FD, #BBDEFB); }
+.img-violet { background: linear-gradient(135deg, rgba(124,111,224,0.12), rgba(59,212,192,0.12)); }
+
+.sponsored-badge {
+  position: absolute; top: 10px; right: 10px;
+  background: var(--gold); color: white;
+  font-size: 10px; font-weight: 700;
+  padding: 3px 8px; border-radius: 6px;
+}
+.post-body { padding: 14px 16px; }
+.post-title { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700; color: var(--dark); }
+.post-desc { font-size: 13px; color: var(--muted); line-height: 1.5; margin: 6px 0 12px; }
+.post-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px; }
+.post-footer { display: flex; justify-content: space-between; align-items: center; }
+.author-row { display: flex; align-items: center; gap: 8px; }
+.av {
+  width: 28px; height: 28px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; color: white; font-weight: 700;
+}
+.av-vt { background: var(--grad); }
+.av-pk { background: linear-gradient(135deg, #F093FB, var(--violet)); }
+.av-tc { background: linear-gradient(135deg, var(--teal), #26C6DA); }
+.author-name { font-size: 12px; font-weight: 600; color: var(--dark); }
+.author-meta { font-size: 11px; color: var(--muted); }
+.action-btn { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); font-weight: 500; }
+.action-btn.liked { color: var(--violet); }
+.actions { display: flex; gap: 12px; }
+.loc-tag { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+
+/* Pack Call card */
+.pack-call-card {
+  background: var(--grad);
+  border-radius: 20px;
+  padding: 18px;
+  color: white;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 8px 28px rgba(124,111,224,0.3);
+  min-height: 140px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.pack-call-card::before {
+  content: ''; position: absolute;
+  top: -30px; right: -30px;
+  width: 120px; height: 120px; border-radius: 50%;
+  background: rgba(255,255,255,0.08);
+}
+.pack-call-card::after {
+  content: ''; position: absolute;
+  bottom: -20px; right: 40px;
+  width: 80px; height: 80px; border-radius: 50%;
+  background: rgba(255,255,255,0.06);
+}
+.pack-call-title { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 700; line-height: 1.3; }
+.pack-call-sub { font-size: 12px; opacity: 0.75; margin: 4px 0 14px; }
+.reply-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(255,255,255,0.95); color: var(--violet);
+  font-size: 13px; font-weight: 700;
+  padding: 9px 16px; border-radius: 12px;
+  width: fit-content;
+}
+
+/* ── 3. EXPLORE ── */
+.explore-wrap { padding: 20px 20px 0; flex: 1; background: var(--bg); display: flex; flex-direction: column; }
+.user-card {
+  background: white;
+  border-radius: 20px;
+  padding: 14px 16px;
+  display: flex; align-items: center; justify-content: space-between;
+  box-shadow: var(--shadow);
+  margin-bottom: 10px;
+}
+.user-avatar {
+  width: 52px; height: 52px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; flex-shrink: 0;
+  background: var(--surf);
+}
+.user-info { flex: 1; margin: 0 12px; }
+.user-name { font-size: 15px; font-weight: 700; color: var(--dark); }
+.user-handle { font-size: 12px; color: var(--muted); font-weight: 500; }
+.user-bio { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.follow-btn {
+  background: var(--grad);
+  border-radius: 12px;
+  padding: 8px 16px;
+  color: white;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.unfollow-btn {
+  border-radius: 12px;
+  padding: 7px 15px;
+  color: var(--dark);
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+  border: 1.5px solid #E0DDD8;
+}
+.trust-score-badge {
+  display: flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 600;
+  color: var(--violet);
+  margin-top: 3px;
+}
+
+/* ── 4. PROFILE ── */
+.profile-header {
+  background: var(--bg);
+  padding: 16px 20px 0;
+}
+.profile-avatar-wrap {
+  width: 80px; height: 80px;
+  border-radius: 50%;
+  background: var(--grad);
+  padding: 2.5px;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 12px;
+}
+.profile-avatar-inner {
+  width: 100%; height: 100%; border-radius: 50%;
+  background: white;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 32px;
+  border: 2px solid var(--bg);
+}
+.profile-name { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800; color: var(--dark); }
+.profile-handle { font-size: 14px; color: var(--muted); margin-top: 2px; }
+.profile-bio { font-size: 14px; color: var(--dark); opacity: 0.75; margin: 8px 0 16px; line-height: 1.5; }
+.stats-row { display: flex; gap: 0; margin-bottom: 16px; }
+.stat-item { flex: 1; text-align: center; }
+.stat-num { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800; color: var(--dark); }
+.stat-label { font-size: 12px; color: var(--muted); font-weight: 500; margin-top: 2px; }
+.stat-divider { width: 1px; background: var(--surf); margin: 4px 0; align-self: stretch; }
+.trust-score-row {
+  background: white;
+  border-radius: 20px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow);
+}
+.trust-label { font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700; color: var(--dark); }
+.trust-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.trust-score-big {
+  font-family: 'Syne', sans-serif;
+  font-size: 32px; font-weight: 800;
+  background: var(--grad-h);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  margin-left: auto;
+}
+.tabs {
+  display: flex; border-bottom: 1px solid var(--surf);
+  padding: 0 20px;
+  margin-bottom: 0;
+}
+.tab-item {
+  flex: 1; text-align: center;
+  padding: 12px 0;
+  font-size: 13px; font-weight: 600;
+  color: var(--muted);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.tab-item.active {
+  color: var(--violet);
+  border-bottom-color: var(--violet);
+}
+.post-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 10px; padding: 14px 20px;
+}
+.grid-card {
+  border-radius: 16px;
+  overflow: hidden;
+  aspect-ratio: 1;
+  position: relative;
+  box-shadow: var(--shadow);
+}
+.grid-img {
+  width: 100%; height: 100%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 36px;
+}
+.grid-overlay {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: linear-gradient(0deg, rgba(26,42,36,0.7), transparent);
+  padding: 8px 10px;
+}
+.grid-title { font-size: 12px; font-weight: 700; color: white; line-height: 1.2; }
+.coins-banner {
+  background: linear-gradient(135deg, rgba(212,175,55,0.12), rgba(212,175,55,0.06));
+  border: 1px solid rgba(212,175,55,0.2);
+  border-radius: 16px;
+  padding: 12px 16px;
+  display: flex; align-items: center; gap: 12px;
+  margin: 0 20px 16px;
+}
+.coins-banner-text { font-size: 13px; font-weight: 600; color: var(--gold); flex: 1; }
+.coins-amount { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800; color: var(--gold); }
+
+/* ── 5. ADD HUB ── */
+.add-hub-wrap { padding: 24px 20px; flex: 1; background: var(--bg); display: flex; flex-direction: column; }
+.hub-title { font-family: 'Syne', sans-serif; font-size: 26px; font-weight: 800; color: var(--dark); text-align: center; }
+.hub-sub { font-size: 14px; color: var(--muted); text-align: center; margin: 8px 0 32px; }
+.hub-card {
+  background: white;
+  border-radius: 24px;
+  padding: 22px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  box-shadow: var(--shadow-md);
+  margin-bottom: 16px;
+  cursor: pointer;
+}
+.hub-icon {
+  width: 64px; height: 64px;
+  border-radius: 18px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px;
+  flex-shrink: 0;
+}
+.hub-icon-violet { background: rgba(124,111,224,0.1); }
+.hub-icon-teal { background: rgba(59,212,192,0.1); }
+.hub-icon-gold { background: rgba(212,175,55,0.1); }
+.hub-card-title { font-family: 'Syne', sans-serif; font-size: 17px; font-weight: 700; color: var(--dark); }
+.hub-card-sub { font-size: 13px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
+.hub-arrow { margin-left: auto; font-size: 18px; color: var(--muted); opacity: 0.5; }
+
+/* ── 6. ADD PICK ── */
+.add-pick-wrap { flex: 1; background: var(--bg); display: flex; flex-direction: column; overflow: hidden; }
+.add-pick-topbar {
+  padding: 14px 20px;
+  display: flex; align-items: center; gap: 12px;
+  background: white;
+  border-bottom: 1px solid var(--surf);
+}
+.back-btn { font-size: 20px; color: var(--dark); opacity: 0.6; }
+.topbar-title { font-family: 'Syne', sans-serif; font-size: 17px; font-weight: 700; color: var(--dark); }
+.topbar-action { margin-left: auto; font-size: 14px; font-weight: 700; color: var(--muted); }
+.topbar-action.active { color: var(--violet); }
+.pick-form { padding: 16px 20px; display: flex; flex-direction: column; gap: 16px; }
+.photo-upload {
+  height: 140px;
+  background: var(--surf);
+  border-radius: 16px;
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 8px;
+  border: 2px dashed #DDD8D0;
+}
+.photo-icon { font-size: 28px; opacity: 0.4; }
+.photo-text { font-size: 13px; color: var(--muted); }
+.field-label { font-size: 11px; font-weight: 700; color: var(--muted); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px; }
+.field-input {
+  background: white;
+  border: 1.5px solid #E8E6E0;
+  border-radius: 14px;
+  padding: 13px 16px;
+  font-size: 15px;
+  color: var(--dark);
+  font-family: 'DM Sans', sans-serif;
+  width: 100%;
+}
+.field-input.focused {
+  border-color: transparent;
+  outline: 2px solid var(--violet);
+}
+.field-input.multiline { min-height: 80px; }
+.category-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.category-chip {
+  border-radius: 20px;
+  padding: 7px 14px;
+  font-size: 13px; font-weight: 600;
+  border: 1.5px solid #E8E6E0;
+  color: var(--dark);
+  cursor: pointer;
+}
+.category-chip.sel { background: var(--grad); color: white; border-color: transparent; }
+
+/* ── 7. POST DETAIL ── */
+.post-detail-wrap { flex: 1; background: white; display: flex; flex-direction: column; }
+.detail-topbar {
+  padding: 14px 20px;
+  display: flex; align-items: center; gap: 12px;
+  border-bottom: 1px solid var(--surf);
+}
+.detail-img { height: 220px; display: flex; align-items: center; justify-content: center; font-size: 70px; }
+.detail-body { padding: 20px; }
+.detail-title { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800; color: var(--dark); line-height: 1.3; }
+.detail-desc { font-size: 14px; color: var(--muted); line-height: 1.6; margin: 12px 0 20px; }
+.detail-author-card {
+  background: var(--surf);
+  border-radius: 16px;
+  padding: 14px;
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 20px;
+}
+.detail-author-av { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; color: white; font-weight: 700; }
+.save-btn {
+  background: var(--surf);
+  border-radius: 14px;
+  padding: 13px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  width: 52px;
+}
+.detail-actions { display: flex; gap: 10px; }
+.detail-action-btn {
+  flex: 1;
+  background: var(--surf);
+  border-radius: 14px;
+  padding: 13px;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  font-size: 14px; font-weight: 600; color: var(--dark);
+}
+.detail-action-btn.liked { color: var(--violet); }
+
+/* ── 8. REQUEST DETAIL ── */
+.req-detail-card {
+  background: var(--grad);
+  margin: 16px;
+  border-radius: 24px;
+  padding: 22px;
+  color: white;
+  position: relative;
+  overflow: hidden;
+}
+.req-detail-card::before {
+  content: ''; position: absolute;
+  top: -40px; right: -40px;
+  width: 150px; height: 150px; border-radius: 50%;
+  background: rgba(255,255,255,0.07);
+}
+.req-detail-title { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800; line-height: 1.3; margin: 10px 0 6px; }
+.req-detail-sub { font-size: 13px; opacity: 0.75; }
+.answers-label { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700; color: var(--dark); padding: 0 20px; margin-bottom: 12px; }
+.answer-card {
+  background: white;
+  border-radius: 20px;
+  padding: 16px;
+  margin: 0 16px 10px;
+  box-shadow: var(--shadow);
+}
+.answer-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.answer-av { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; color: white; font-weight: 700; }
+.answer-name { font-size: 14px; font-weight: 700; color: var(--dark); }
+.answer-time { font-size: 12px; color: var(--muted); }
+.answer-title { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700; color: var(--dark); margin-bottom: 4px; }
+.answer-desc { font-size: 13px; color: var(--muted); line-height: 1.5; }
+.answer-score { margin-left: auto; }
+
+/* ── 9. PUBLIC PROFILE ── */
+.pub-profile-header {
+  position: relative;
+  background: var(--grad);
+  height: 120px;
+}
+.pub-profile-av {
+  position: absolute;
+  bottom: -36px; left: 20px;
+  width: 72px; height: 72px;
+  border-radius: 50%;
+  border: 3px solid white;
+  background: var(--surf);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px;
+}
+.pub-profile-actions {
+  position: absolute;
+  bottom: -20px; right: 20px;
+  display: flex; gap: 8px;
+}
+.pub-profile-body { padding: 48px 20px 20px; }
+.pub-profile-name { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800; color: var(--dark); }
+.pub-profile-handle { font-size: 13px; color: var(--muted); }
+.pub-profile-bio { font-size: 14px; color: var(--dark); opacity: 0.75; margin: 8px 0 16px; line-height: 1.5; }
+
+/* ── 10. COLLECTION DETAIL ── */
+.collection-header {
+  background: linear-gradient(180deg, rgba(124,111,224,0.12) 0%, transparent 100%);
+  padding: 20px;
+}
+.collection-title { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800; color: var(--dark); }
+.collection-sub { font-size: 13px; color: var(--muted); margin-top: 4px; }
+.collection-cover {
+  display: flex; gap: 6px;
+  height: 100px;
+  margin-top: 14px;
+  border-radius: 16px; overflow: hidden;
+}
+.cover-main { flex: 2; display: flex; align-items: center; justify-content: center; font-size: 40px; }
+.cover-side { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.cover-sm { flex: 1; display: flex; align-items: center; justify-content: center; font-size: 24px; }
+
+/* ── 11. ASK PACK ── */
+.ask-pack-wrap { flex: 1; background: white; display: flex; flex-direction: column; padding: 0; }
+.ask-topbar {
+  padding: 14px 20px 10px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.step-dots { display: flex; gap: 6px; align-items: center; }
+.dot {
+  height: 6px; border-radius: 3px;
+  background: var(--surf);
+}
+.dot.active { width: 24px; background: var(--grad-h); background: linear-gradient(90deg, var(--violet), var(--teal)); }
+.dot.inactive { width: 8px; }
+.ask-title-input {
+  font-family: 'Syne', sans-serif;
+  font-size: 26px; font-weight: 800;
+  color: var(--dark);
+  padding: 4px 24px 24px;
+  line-height: 1.3;
+}
+.ask-title-input .placeholder { color: rgba(26,42,36,0.3); }
+.signal-card {
+  background: white;
+  border-radius: 24px;
+  padding: 20px;
+  margin: 0 24px;
+  box-shadow: var(--shadow-md);
+}
+.signal-section-title { font-size: 13px; font-weight: 700; color: var(--dark); display: flex; align-items: center; gap: 6px; margin-bottom: 14px; }
+.tag-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.tag-chip {
+  border-radius: 32px;
+  padding: 8px 14px;
+  font-size: 13px; font-weight: 700;
+  border: 1px solid #E8E6E0;
+  color: var(--dark);
+}
+.tag-chip.sel { background: var(--grad); color: white; border-color: transparent; }
+
+/* ── 12. ACCEPT OFFER SHEET ── */
+.sheet-handle { width: 40px; height: 4px; background: var(--surf); border-radius: 2px; margin: 12px auto 20px; }
+.offer-brand {
+  width: 64px; height: 64px;
+  border-radius: 20px;
+  background: var(--grad);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px;
+  margin-bottom: 14px;
+}
+.offer-title { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800; color: var(--dark); }
+.offer-sub { font-size: 14px; color: var(--muted); margin: 6px 0 20px; }
+.reward-card {
+  background: linear-gradient(135deg, rgba(212,175,55,0.1), rgba(212,175,55,0.05));
+  border: 1px solid rgba(212,175,55,0.2);
+  border-radius: 16px;
+  padding: 14px 16px;
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 16px;
+}
+.reward-icon { font-size: 28px; }
+.reward-label { font-size: 13px; color: var(--muted); }
+.reward-amount { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800; color: var(--gold); }
+.requirement-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.req-label { font-size: 13px; color: var(--muted); }
+.req-value { font-size: 13px; font-weight: 600; color: var(--dark); }
+.req-check { color: var(--teal); font-size: 16px; }
+
+/* ─── TrustScore Ring ─── */
+.ring-wrap { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.ring-label { font-size: 9px; font-weight: 600; color: var(--muted); letter-spacing: 0.04em; text-transform: uppercase; }
+
+svg.ring { width: 40px; height: 40px; }
+svg.ring-lg { width: 56px; height: 56px; }
+</style>
+</head>
+<body>
+
+<h1 class="page-title">TrustList — All Screens</h1>
+<p class="page-sub">Artisan Pastel · Violet #7C6FE0 → Teal #3BD4C0 · Syne + DM Sans</p>
+
+<!-- ═══════════════════ AUTH ═══════════════════ -->
+<div class="section-label">01 · Auth</div>
+<div class="phones-row">
+
+  <!-- Login -->
+  <div>
+    <div class="phone-label">Sign In</div>
+    <div class="phone">
+      <div class="status-bar"><span>9:41</span><span>●●●</span></div>
+      <div class="auth-bg">
+        <div class="auth-card">
+          <div class="auth-logo">🐺</div>
+          <div class="auth-title">Welcome back</div>
+          <div class="auth-sub">Sign in to see your pack's picks</div>
+          <div class="input-wrap">
+            <span class="input-icon">✉️</span>
+            <span class="input-placeholder">Email</span>
+          </div>
+          <div class="input-wrap focused">
+            <span class="input-icon">🔒</span>
+            <span class="input-text">••••••••</span>
+          </div>
+          <div style="text-align:right; margin-bottom:20px;">
+            <span style="font-size:13px; color:var(--violet); font-weight:600;">Forgot password?</span>
+          </div>
+          <div class="grad-btn">Sign in</div>
+          <div class="auth-toggle">No account? <span>Sign up</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sign Up -->
+  <div>
+    <div class="phone-label">Sign Up</div>
+    <div class="phone">
+      <div class="status-bar"><span>9:41</span><span>●●●</span></div>
+      <div class="auth-bg">
+        <div class="auth-card">
+          <div class="auth-logo">🐺</div>
+          <div class="auth-title">Join TrustList</div>
+          <div class="auth-sub">Your pack is waiting</div>
+          <div class="input-wrap focused">
+            <span class="input-icon">👤</span>
+            <span class="input-text">Stepan</span>
+          </div>
+          <div class="input-wrap">
+            <span class="input-icon">@</span>
+            <span class="input-placeholder">Handle (@stepan)</span>
+          </div>
+          <div class="input-wrap">
+            <span class="input-icon">✉️</span>
+            <span class="input-placeholder">Email</span>
+          </div>
+          <div class="input-wrap">
+            <span class="input-icon">🔒</span>
+            <span class="input-placeholder">Password</span>
+          </div>
+          <div style="height:16px;"></div>
+          <div class="grad-btn">Create account</div>
+          <div class="auth-toggle">Already have one? <span>Sign in</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════ FEED ═══════════════════ -->
+<div class="section-label">02 · Feed</div>
+<div class="phones-row">
+
+  <div>
+    <div class="phone-label">Home Feed</div>
+    <div class="phone">
+      <div class="status-bar"><span>9:41</span><span>●●●</span></div>
+
+      <!-- Header -->
+      <div class="top-nav">
+        <div>
+          <div class="greeting-sub">Good morning,</div>
+          <div class="greeting-name">Stepan 👋</div>
+        </div>
+        <div class="coins-chip">🪙 240</div>
+      </div>
+
+      <!-- Search -->
+      <div class="search-bar">
+        <span style="font-size:16px;opacity:0.4;">🔍</span>
+        <span>Search in the pack...</span>
+      </div>
+
+      <!-- Pack Pulse -->
+      <div class="section-row">
+        <span class="section-title">Pack Pulse</span>
+        <span class="see-all">See all</span>
+      </div>
+      <div class="pack-scroll">
+        <div class="pack-item"><div class="pack-ring"><div class="pack-inner">😊</div></div><span class="pack-name">Masha</span></div>
+        <div class="pack-item"><div class="pack-ring"><div class="pack-inner">🧑</div></div><span class="pack-name">Artem</span></div>
+        <div class="pack-item"><div class="pack-ring"><div class="pack-inner">👩</div></div><span class="pack-name">Anna</span></div>
+        <div class="pack-item"><div class="pack-ring muted"><div class="pack-inner">🧔</div></div><span class="pack-name">Dima</span></div>
+        <div class="pack-item"><div class="pack-ring muted"><div class="pack-inner">👱</div></div><span class="pack-name">Kate</span></div>
+      </div>
+
+      <!-- Feed -->
+      <div class="section-row">
+        <span class="section-title">Pack Feed</span>
+        <span class="see-all">All posts</span>
+      </div>
+      <div class="feed">
+        <!-- Pack Call -->
+        <div class="pack-call-card">
+          <div>
+            <span class="pill pill-white">🐺 Pack Call</span>
+            <div class="pack-call-title">Best ramen in Moscow?</div>
+            <div class="pack-call-sub">Masha asks · 6 replies</div>
+          </div>
+          <div class="reply-btn">Reply →</div>
+        </div>
+        <!-- Post -->
+        <div class="post-card">
+          <div class="post-img img-coffee">☕</div>
+          <div class="post-body">
+            <div class="loc-tag">📍 Patriarshye, Moscow</div>
+            <div class="post-header">
+              <div>
+                <div class="pill pill-violet" style="margin-bottom:6px;">☕ Coffee</div>
+                <div class="post-title">Shoebox Coffee</div>
+              </div>
+              <div class="ring-wrap">
+                <svg class="ring" viewBox="0 0 40 40">
+                  <circle cx="20" cy="20" r="16" fill="none" stroke="#F0EEEB" stroke-width="3.5"/>
+                  <circle cx="20" cy="20" r="16" fill="none" stroke="url(#g1)" stroke-width="3.5" stroke-dasharray="88 12" stroke-dashoffset="25" stroke-linecap="round"/>
+                  <defs><linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#7C6FE0"/><stop offset="100%" stop-color="#3BD4C0"/></linearGradient></defs>
+                  <text x="20" y="24" text-anchor="middle" font-family="Syne" font-size="10" font-weight="700" fill="#1A2A24">8.8</text>
+                </svg>
+                <span class="ring-label">trust</span>
+              </div>
+            </div>
+            <div class="post-desc">Quiet spot, no queues. Single origin changed every two weeks.</div>
+            <div class="post-footer">
+              <div class="author-row"><div class="av av-vt">M</div><div><div class="author-name">Masha P.</div><div class="author-meta">Pack · 2h ago</div></div></div>
+              <div class="actions"><div class="action-btn liked">♥ 24</div><div class="action-btn">💬 8</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bottom-nav">
+        <div class="nav-item"><div class="nav-icon active">🏠</div><span class="nav-label active">Feed</span></div>
+        <div class="nav-item"><div class="nav-icon">🔍</div><span class="nav-label">People</span></div>
+        <div class="nav-fab">＋</div>
+        <div class="nav-item"><div class="nav-icon">👤</div><span class="nav-label">Profile</span></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════ EXPLORE ═══════════════════ -->
+<div class="section-label">03 · Explore / People</div>
+<div class="phones-row">
+
+  <div>
+    <div class="phone-label">Search People</div>
+    <div class="phone">
+      <div class="status-bar"><span>9:41</span><span>●●●</span></div>
+      <div class="explore-wrap">
+        <div style="font-family:'Syne',sans-serif; font-size:22px; font-weight:800; color:var(--dark); margin-bottom:14px;">Community</div>
+        <!-- Search -->
+        <div class="input-wrap" style="background:white; margin-bottom:16px;">
+          <span class="input-icon">🔍</span>
+          <span class="input-placeholder">Search by name or @handle...</span>
+        </div>
+
+        <!-- Users -->
+        <div style="flex:1; overflow:hidden;">
+          <div class="user-card">
+            <div class="user-avatar" style="background:var(--grad); color:white; font-size:22px; font-weight:700;">M</div>
+            <div class="user-info">
+              <div class="user-name">Masha Petrova</div>
+              <div class="user-handle">@masha_p</div>
+              <div class="trust-score-badge">⭐ 8.4 TrustScore</div>
+            </div>
+            <div class="unfollow-btn">Following</div>
+          </div>
+          <div class="user-card">
+            <div class="user-avatar" style="background:linear-gradient(135deg,#F093FB,#7C6FE0); color:white; font-size:22px; font-weight:700;">A</div>
+            <div class="user-info">
+              <div class="user-name">Artem Sidorov</div>
+              <div class="user-handle">@artem</div>
+              <div class="trust-score-badge">⭐ 7.1 TrustScore</div>
+            </div>
+            <div class="follow-btn">Follow</div>
+          </div>
+          <div class="user-card">
+            <div class="user-avatar" style="background:linear-gradient(135deg,#3BD4C0,#26C6DA); color:white; font-size:22px; font-weight:700;">A</div>
+            <div class="user-info">
+              <div class="user-name">Anna Kozlova</div>
+              <div class="user-handle">@anna_k</div>
+              <div class="user-bio">Food & places explorer 🌿</div>
+              <div class="trust-score-badge">⭐ 9.2 TrustScore</div>
+            </div>
+            <div class="follow-btn">Follow</div>
+          </div>
+          <div class="user-card">
+            <div class="user-avatar" style="background:#E8E6E0; font-size:22px;">🧔</div>
+            <div class="user-info">
+              <div class="user-name">Dima Volkov</div>
+              <div class="user-handle">@dima_v</div>
+              <div class="trust-score-badge">⭐ 6.5 TrustScore</div>
+            </div>
+            <div class="follow-btn">Follow</div>
+          </div>
+        </div>
+      </div>
+      <div class="bottom-nav">
+        <div class="nav-item"><div class="nav-icon">🏠</div><span class="nav-label">Feed</span></div>
+        <div class="nav-item"><div class="nav-icon active">🔍</div><span class="nav-label active">People</span></div>
+        <div class="nav-fab">＋</div>
+        <div class="nav-item"><div class="nav-icon">👤</div><span class="nav-label">Profile</span></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════ PROFILE ═══════════════════ -->
+<div class="section-label">04 · Profile</div>
+<div class="phones-row">
+
+  <!-- My Profile -->
+  <div>
+    <div class="phone-label">My Profile</div>
+    <div class="phone">
+      <div class="status-bar"><span>9:41</span><span>●●●</span></div>
+      <div style="flex:1; overflow:hidden; display:flex; flex-direction:column; background:var(--bg);">
+        <div class="profile-header">
+          <!-- Avatar -->
+          <div style="display:flex; align-items:flex-end; justify-content:space-between; margin-bottom:12px;">
+            <div class="profile-avatar-wrap" style="margin-bottom:0;">
+              <div class="profile-avatar-inner">😊</div>
+            </div>
+            <button style="border:1.5px solid #E0DDD8; border-radius:12px; padding:8px 16px; font-size:13px; font-weight:700; background:white; color:var(--dark);">Edit profile</button>
+          </div>
+          <div class="profile-name">Stepan K.</div>
+          <div class="profile-handle">@stepan · Moscow</div>
+          <div class="profile-bio">City explorer. Coffee nerd. Trust the pack 🐺</div>
+
+          <!-- Stats -->
+          <div class="stats-row">
+            <div class="stat-item"><div class="stat-num">47</div><div class="stat-label">Picks</div></div>
+            <div class="stat-divider"></div>
+            <div class="stat-item"><div class="stat-num">312</div><div class="stat-label">Followers</div></div>
+            <div class="stat-divider"></div>
+            <div class="stat-item"><div class="stat-num">89</div><div class="stat-label">Following</div></div>
+          </div>
+
+          <!-- TrustScore + coins -->
+          <div class="trust-score-row">
+            <svg class="ring-lg" viewBox="0 0 56 56">
+              <circle cx="28" cy="28" r="22" fill="none" stroke="#F0EEEB" stroke-width="4"/>
+              <circle cx="28" cy="28" r="22" fill="none" stroke="url(#gp)" stroke-width="4" stroke-dasharray="110 28" stroke-dashoffset="34" stroke-linecap="round"/>
+              <defs><linearGradient id="gp" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#7C6FE0"/><stop offset="100%" stop-color="#3BD4C0"/></linearGradient></defs>
+              <text x="28" y="33" text-anchor="middle" font-family="Syne" font-size="13" font-weight="800" fill="#1A2A24">7.8</text>
+            </svg>
+            <div>
+              <div class="trust-label">TrustScore</div>
+              <div class="trust-sub">Based on 47 picks</div>
+            </div>
+            <div class="coins-chip" style="margin-left:auto;">🪙 240</div>
+          </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+          <div class="tab-item active">Picks</div>
+          <div class="tab-item">Collections</div>
+          <div class="tab-item">Offers</div>
+        </div>
+
+        <!-- Grid -->
+        <div class="post-grid">
+          <div class="grid-card"><div class="grid-img img-coffee">☕</div><div class="grid-overlay"><div class="grid-title">Shoebox Coffee</div></div></div>
+          <div class="grid-card"><div class="grid-img img-food">🍜</div><div class="grid-overlay"><div class="grid-title">Ramen Lab</div></div></div>
+          <div class="grid-card"><div class="grid-img img-place">🌿</div><div class="grid-overlay"><div class="grid-title">Secret Garden</div></div></div>
+          <div class="grid-card"><div class="grid-img img-violet">🍕</div><div class="grid-overlay"><div class="grid-title">Pizzeria Roma</div></div></div>
+        </div>
+      </div>
+      <div class="bottom-nav">
+        <div class="nav-item"><div class="nav-icon">🏠</div><span class="nav-label">Feed</span></div>
+        <div class="nav-item"><div class="nav-icon">🔍</div><span class="nav-label">People</span></div>
+        <div class="nav-fab">＋</div>
+        <div class="nav-item"><div class="nav-icon active">👤</div><span class="nav-label active">Profile</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Public Profile -->
+  <div>
+    <div class="phone-label">Public Profile</div>
+    <div class="phone">
+      <div class="status-bar"><span>9:41</span><span>●●●</span></div>
+      <div style="flex:1; display:flex; flex-direction:column; background:var(--bg);">
+        <!-- Cover -->
+        <div class="pub-profile-header">
+          <div class="pub-profile-av">😊</div>
+          <div class="pub-profile-actions">
+            <div class="follow-btn" style="border-radius:14px; padding:9px 18px;">Follow</div>
+            <div class="save-btn">📨</div>
+          </div>
+        </div>
+        <div class="pub-profile-body">
+          <div class="pub-profile-name">Masha Petrova</div>
+          <div class="pub-profile-handle">@masha_p · Moscow</div>
+          <div class="pub-profile-bio">Restaurant scout. Only real picks 🍽️</div>
+
+          <div class="stats-row" style="margin-bottom:16px;">
+            <div class="stat-item"><div class="stat-num">63</div><div class="stat-label">Picks</div></div>
+            <div class="stat-divider"></div>
+            <div class="stat-item"><div class="stat-num">891</div><div class="stat-label">Followers</div></div>
+            <div class="stat-divider"></div>
+            <div class="stat-item">
+              <div style="display:flex; align-items:center; justify-content:center;">
+                <svg style="width:40px;height:40px;" viewBox="0 0 40 40">
+                  <circle cx="20" cy="20" r="16" fill="none" stroke="#F0EEEB" stroke-width="3.5"/>
+                  <circle cx="20" cy="20" r="16" fill="none" stroke="url(#gpp)" stroke-width="3.5" stroke-dasharray="84 16" stroke-dashoffset="25" stroke-linecap="round"/>
+                  <defs><linearGradient id="gpp" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#7C6FE0"/><stop offset="100%" stop-color="#3BD4C0"/></linearGradient></defs>
+                  <text x="20" y="24" text-anchor="middle" font-family="Syne" font-size="10" font-weight="700" fill="#1A2A24">8.4</text>
+                </svg>
+              </div>
+              <div class="stat-label">TrustScore</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+          <div class="tab-item active">Picks</div>
+          <div class="tab-item">Collections</div>
+        </div>
+
+        <!-- Grid -->
+        <div class="post-grid">
+          <div class="grid-card"><div class="grid-img img-food">🍜</div><div class="grid-overlay"><div class="grid-title">Ramen Lab</div></div></div>
+          <div class="grid-card"><div class="grid-img img-coffee">☕</div><div class="grid-overlay"><div class="grid-title">Brew Station</div></div></div>
+          <div class="grid-card"><div class="grid-img img-violet">🍣</div><div class="grid-overlay"><div class="grid-title">Sushi Omakase</div></div></div>
+          <div class="grid-card"><div class="grid-img img-place">🌿</div><div class="grid-overlay"><div class="grid-title">Rooftop Bar</div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════ ADD HUB ═══════════════════ -->
+<div class="section-label">05 · Add Hub (+ button)</div>
+<div class="phones-row">
+
+  <!-- Regular user -->
+  <div>
+    <div class="phone-label">User Hub</div>
+    <div class="phone">
+      <div class="status-bar"><span>9:41</span><span>●●●</span></div>
+      <div class="add-hub-wrap">
+        <div class="hub-title">What's on your mind?</div>
+        <div class="hub-sub">Share a pick or ask your pack</div>
+
+        <div class="hub-card">
+          <div class="hub-icon hub-icon-violet">📝</div>
+          <div>
+            <div class="hub-card-title">Share a Pick</div>
+            <div class="hub-card-sub">Recommend a place, café, or service your pack will love</div>
+          </div>
+          <div class="hub-arrow">›</div>
+        </div>
+
+        <div class="hub-card">
+          <div class="hub-icon hub-icon-teal">🐺</div>
+          <div>
+            <div class="hub-card-title">Ask the Pack</div>
+            <div class="hub-card-sub">Send a signal — get real recs from people you trust</div>
+          </div>
+          <div class="hub-arrow">›</div>
+        </div>
+
+        <div style="margin-top:auto; padding-top:24px;">
+          <div style="font-size:12px; color:var(--muted); text-align:center;">Are you a business? <span style="color:var(--violet); font-weight:600;">Switch to Business →</span></div>
+        </div>
+      </div>
+      <div class="bottom-nav">
+        <div class="nav-item"><div class="nav-icon">🏠</div><span class="nav-label">Feed</span></div>
+        <div class="nav-item"><div class="nav-icon">🔍</div><span class="nav-label">People</span></div>
+        <div class="nav-fab">＋</div>
+        <div class="nav-item"><div class="nav-icon">👤</div><span class="nav-label">Profile</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Business hub -->
+  <div>
+    <div class="phone-label">Business Hub</div>
+    <div class="phone">
+      <div class="status-bar"><span>9:41</span><span>●●●</span></div>
+      <div class="add-hub-wrap">
+        <div class="hub-title">Grow your brand</div>
+        <div class="hub-sub">Native ads that people actually trust</div>
+
+        <div class="hub-card">
+          <div class="hub-icon hub-icon-gold">📢</div>
+          <div>
+            <div class="hub-card-title">Ad Campaign</div>
+            <div class="hub-card-sub">Pay TrustCoins to users who create posts about you</div>
+          </div>
+          <div class="hub-arrow">›</div>
+        </div>
+
+        <div class="hub-card">
+          <div class="hub-icon hub-icon-violet">📝</div>
+          <div>
+            <div class="hub-card-title">Post a Pick</div>
+            <div class="hub-card-sub">Share a place or product from your business</div>
+          </div>
+          <div class="hub-arrow">›</div>
+        </div>
+
+        <div style="margin-top:16px; background:rgba(212,175,55,0.08); border:1px solid rgba(212,175,55,0.2); border-radius:16px; padding:14px 16px;">
+          <div style="font-size:13px; font-weight:700; color:var(--gold); margin-bottom:4px;">🪙 Campaign balance: 1,200 TC</div>
+          <div style="font-size:12px; color:var(--muted);">Top up to launch more campaigns</div>
+        </div>
+      </div>
+      <div class="bottom-nav">
+        <div class="nav-item"><div class="nav-icon">🏠</div><span class="nav-label">Feed</span></div>
+        <div class="nav-item"><div class="nav-icon">🔍</div><span class="nav-label">People</span></div>
+        <div class="nav-fab">＋</div>
+        <div class="nav-item"><div class="nav-icon">👤</div><span class="nav-label">Profile</span></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════ ADD PICK ═══════════════════ -->
+<div class="section-label">06 · Add a Pick</div>
+<div class="phones-row">
+
+  <div>
+    <div class="phone-label">Post Creation</div>
+    <div class="phone">
+      <div class="status-bar"><span>9:41</span><span>●●●</span></div>
+      <div class="add-pick-wrap">
+        <div class="add-pick-topbar">
+          <span class="back-btn">←</span>
+          <span class="topbar-title">Add a Pick</span>
+          <span class="topbar-action active">Publish</span>
+        </div>
+        <div style="flex:1; overflow:hidden; padding:16px 20px; display:flex; flex-direction:column; gap:16px; background:var(--bg);">
+          <!-- Reply to -->
+          <div class="input-wrap" style="background:rgba(124,111,224,0.06); border-color:rgba(124,111,224,0.2);">
+            <span style="font-size:14px;">🐺</span>
+            <span style="font-size:13px; color:var(--violet); font-weight:600;">Reply to pack signal: ramen in Moscow?</span>
+          </div>
+
+          <!-- Photo -->
+          <div>
+            <div class="field-label">Photo</div>
+            <div class="photo-upload">
+              <div class="photo-icon">🖼️</div>
+              <div class="photo-text">Tap to add a photo (optional)</div>
+            </div>
+          </div>
+
+          <!-- Title -->
+          <div>
+            <div class="field-label">Title</div>
+            <div class="field-input focused">Ramen Lab — finally found it</div>
+          </div>
+
+          <!-- Category chips -->
+          <div>
+            <div class="field-label">Category</div>
+            <div class="category-chips">
+              <div class="category-chip sel">🍜 Food</div>
+              <div class="category-chip">☕ Coffee</div>
+              <div class="category-chip">🌿 Places</div>
+              <div class="category-chip">🎉 Events</div>
+            </div>
+          </div>
+
+          <!-- Description -->
+          <div>
+            <div class="field-label">Why do you recommend it?</div>
+            <div class="field-input multiline">Tonkotsu that's not embarrassing. 18-hour broth, big portions. Only downside — loud on Fridays.</div>
+          </div>
+
+          <!-- Publish btn -->
+          <div class="grad-btn">Publish Pick</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════ POST DETAIL ═══════════════════ -->
+<div class="section-label">07 · Post Detail</div>
+<div class="phones-row">
+
+  <div>
+    <div class="phone-label">Post Detail</div>
+    <div class="phone">
+      <div class="status-bar"><span>9:41</span><span>●●●</span></div>
+      <div class="post-detail-wrap">
+        <div class="detail-topbar">
+          <span class="back-btn">←</span>
+          <span style="font-family:'Syne',sans-serif; font-size:16px; font-weight:700; color:var(--dark);">Pick</span>
+          <div class="save-btn" style="margin-left:auto;">🔖</div>
+        </div>
+        <div style="flex:1; overflow:hidden; background:white;">
+          <div class="detail-img img-food">🍜</div>
+          <div class="detail-body">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
+              <div>
+                <div class="pill pill-violet" style="margin-bottom:8px;">🍜 Food</div>
+                <div class="detail-title">Ramen Lab — finally found it</div>
+                <div class="loc-tag" style="margin-top:6px;">📍 Tsvetney Bulvar, Moscow</div>
+              </div>
+              <div class="ring-wrap" style="margin-left:12px;">
+                <svg class="ring-lg" viewBox="0 0 56 56">
+                  <circle cx="28" cy="28" r="22" fill="none" stroke="#F0EEEB" stroke-width="4"/>
+                  <circle cx="28" cy="28" r="22" fill="none" stroke="url(#gd)" stroke-width="4" stroke-dasharray="110 28" stroke-dashoffset="34" stroke-linecap="round"/>
+                  <defs><linearGradient id="gd" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#7C6FE0"/><stop offset="100%" stop-color="#3BD4C0"/></linearGradient></defs>
+                  <text x="28" y="33" text-anchor="middle" font-family="Syne" font-size="13" font-weight="800" fill="#1A2A24">7.5</text>
+                </svg>
+                <span class="ring-label">trust</span>
+              </div>
+            </div>
+            <div class="detail-desc">Tonkotsu that's not embarrassing. Big portions, broth cooked for 18 hours. Only minus — noisy on Fridays.</div>
+            <div class="detail-author-card">
+              <div class="detail-author-av av-pk">A</div>
+              <div>
+                <div style="font-size:14px; font-weight:700; color:var(--dark);">Artem Sidorov</div>
+                <div style="font-size:12px; color:var(--muted);">Pack · yesterday</div>
+              </div>
+              <div class="trust-score-badge" style="margin-left:auto;">⭐ 7.1</div>
+            </div>
+            <div class="detail-actions">
+              <div class="detail-action-btn liked">♥ 41</div>
+              <div class="detail-action-btn">💬 12 Comments</div>
+              <div class="save-btn">📨</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════ PACK CALL ═══════════════════ -->
+<div class="section-label">08 · Pack Call — Send & Detail</div>
+<div class="phones-row">
+
+  <!-- Step 1 -->
+  <div>
+    <div class="phone-label">Ask Pack — Step 1</div>
+    <div class="phone">
+      <div class="status-bar"><span>9:41</span><span>●●●</span></div>
+      <div class="ask-pack-wrap">
+        <div class="ask-topbar">
+          <span style="font-size:20px; color:var(--muted);">✕</span>
+          <div class="step-dots">
+            <div class="dot active"></div>
+            <div class="dot inactive"></div>
+          </div>
+          <div style="width:32px;"></div>
+        </div>
+        <div class="ask-title-input">
+          <span class="placeholder">What are we looking for today?</span>
+        </div>
+        <div class="signal-card">
+          <div class="signal-section-title">🔔 Signal options</div>
+          <div class="tag-chips">
+            <div class="tag-chip sel">🍔 Eat</div>
+            <div class="tag-chip">🍷 Drink</div>
+            <div class="tag-chip">🆘 Urgent</div>
+            <div class="tag-chip">📅 Date</div>
+            <div class="tag-chip">🔧 Services</div>
+            <div class="tag-chip">🎉 Party</div>
+          </div>
+          <div style="height:1px; background:var(--surf); margin:16px 0;"></div>
+          <div style="font-size:13px; color:var(--muted); display:flex; align-items:center; gap:6px;">📍 Current area</div>
+        </div>
+        <div style="padding:24px; margin-top:auto;">
+          <div class="grad-btn" style="display:flex; align-items:center; justify-content:center; gap:8px;">Next <span>→</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 2 -->
+  <div>
+    <div class="phone-label">Ask Pack — Step 2</div>
+    <div class="phone">
+      <div class="status-bar"><span>9:41</span><span>●●●</span></div>
+      <div class="ask-pack-wrap">
+        <div class="ask-topbar">
+          <span style="font-size:20px; color:var(--muted);">✕</span>
+          <div class="step-dots">
+            <div class="dot active"></div>
+            <div class="dot active"></div>
+          </div>
+          <div style="width:32px;"></div>
+        </div>
+        <div style="padding:0 24px 16px;">
+          <div style="font-family:'Syne',sans-serif; font-size:26px; font-weight:800; color:var(--dark);">Who to ask?</div>
+          <div style="font-size:14px; color:var(--muted); margin-top:4px;">Choose friends to send the signal to</div>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:0 24px 12px;">
+          <span style="font-size:14px; font-weight:700; color:var(--dark);">Your pack (4)</span>
+          <span style="font-size:13px; font-weight:700; color:var(--dark);">Clear all</span>
+        </div>
+        <div style="padding:0 24px; display:flex; flex-direction:column; gap:10px;">
+          <!-- Friend selected -->
+          <div style="background:white; border-radius:20px; border:1.5px solid var(--violet); padding:14px 16px; display:flex; align-items:center; justify-content:space-between;">
+            <div style="display:flex; align-items:center; gap:12px;">
+              <div class="av av-vt" style="width:44px;height:44px;font-size:16px;">M</div>
+              <div><div class="author-name" style="font-size:14px;">Masha Petrova</div><div class="author-meta">@masha_p</div></div>
+            </div>
+            <div style="width:24px;height:24px;border-radius:50%;background:var(--grad);display:flex;align-items:center;justify-content:center;font-size:13px;color:white;">✓</div>
+          </div>
+          <div style="background:white; border-radius:20px; border:1.5px solid var(--violet); padding:14px 16px; display:flex; align-items:center; justify-content:space-between;">
+            <div style="display:flex; align-items:center; gap:12px;">
+              <div class="av av-pk" style="width:44px;height:44px;font-size:16px;">A</div>
+              <div><div class="author-name" style="font-size:14px;">Artem Sidorov</div><div class="author-meta">@artem</div></div>
+            </div>
+            <div style="width:24px;height:24px;border-radius:50%;background:var(--grad);display:flex;align-items:center;justify-content:center;font-size:13px;color:white;">✓</div>
+          </div>
+          <div style="background:white; border-radius:20px; border:1px solid #E8E6E0; padding:14px 16px; display:flex; align-items:center; justify-content:space-between;">
+            <div style="display:flex; align-items:center; gap:12px;">
+              <div class="av av-tc" style="width:44px;height:44px;font-size:16px;">A</div>
+              <div><div class="author-name" style="font-size:14px;">Anna Kozlova</div><div class="author-meta">@anna_k</div></div>
+            </div>
+            <div style="width:24px;height:24px;border-radius:50%;border:2px solid #E0DDD8;"></div>
+          </div>
+        </div>
+        <div style="padding:20px 24px; margin-top:auto;">
+          <div class="grad-btn">Send signal 🐺</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Request Detail -->
+  <div>
+    <div class="phone-label">Pack Call Detail</div>
+    <div class="phone">
+      <div class="status-bar"><span>9:41</span><span>●●●</span></div>
+      <div style="flex:1; display:flex; flex-direction:column; background:var(--bg);">
+        <div class="detail-topbar" style="border-bottom:none; background:var(--bg);">
+          <span class="back-btn">←</span>
+          <span style="font-family:'Syne',sans-serif; font-size:16px; font-weight:700; color:var(--dark);">Pack Call</span>
+        </div>
+        <div class="req-detail-card">
+          <span class="pill pill-white">🐺 Pack Call</span>
+          <div class="req-detail-title">Best ramen in Moscow?</div>
+          <div class="req-detail-sub">Masha asks · 📍 Current area · 3h ago</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:12px;">
+            <div class="av av-vt" style="width:28px;height:28px;font-size:11px;">M</div>
+            <div class="av av-pk" style="width:28px;height:28px;font-size:11px;">A</div>
+            <div class="av av-tc" style="width:28px;height:28px;font-size:11px;">A</div>
+            <span style="font-size:12px;opacity:0.8;margin-left:4px;">6 answers so far</span>
+          </div>
+        </div>
+        <div style="padding:16px 20px 8px;">
+          <div class="answers-label" style="padding:0; margin:0 0 12px;">Answers</div>
+        </div>
+        <div class="answer-card">
+          <div class="answer-header">
+            <div class="answer-av av-vt">M</div>
+            <div><div class="answer-name">Masha P.</div><div class="answer-time">2h ago</div></div>
+            <div class="answer-score">
+              <svg width="36" height="36" viewBox="0 0 40 40">
+                <circle cx="20" cy="20" r="16" fill="none" stroke="#F0EEEB" stroke-width="3.5"/>
+                <circle cx="20" cy="20" r="16" fill="none" stroke="url(#ga1)" stroke-width="3.5" stroke-dasharray="88 12" stroke-dashoffset="25" stroke-linecap="round"/>
+                <defs><linearGradient id="ga1" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#7C6FE0"/><stop offset="100%" stop-color="#3BD4C0"/></linearGradient></defs>
+                <text x="20" y="24" text-anchor="middle" font-family="Syne" font-size="10" font-weight="700" fill="#1A2A24">8.8</text>
+              </svg>
+            </div>
+          </div>
+          <div class="answer-title">Shoebox Coffee (also does ramen!)</div>
+          <div class="answer-desc">They added a lunch menu. Best tonkotsu I've had in Moscow — no crowds.</div>
+        </div>
+        <div class="answer-card">
+          <div class="answer-header">
+            <div class="answer-av av-pk">A</div>
+            <div><div class="answer-name">Artem S.</div><div class="answer-time">1h ago</div></div>
+            <div class="answer-score">
+              <svg width="36" height="36" viewBox="0 0 40 40">
+                <circle cx="20" cy="20" r="16" fill="none" stroke="#F0EEEB" stroke-width="3.5"/>
+                <circle cx="20" cy="20" r="16" fill="none" stroke="url(#ga2)" stroke-width="3.5" stroke-dasharray="75 25" stroke-dashoffset="25" stroke-linecap="round"/>
+                <defs><linearGradient id="ga2" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#7C6FE0"/><stop offset="100%" stop-color="#3BD4C0"/></linearGradient></defs>
+                <text x="20" y="24" text-anchor="middle" font-family="Syne" font-size="10" font-weight="700" fill="#1A2A24">7.5</text>
+              </svg>
+            </div>
+          </div>
+          <div class="answer-title">Ramen Lab on Tsvetney</div>
+          <div class="answer-desc">18h broth. Big portions. Loud on weekends but totally worth it.</div>
+        </div>
+        <div style="padding:16px;">
+          <div class="grad-btn sm" style="text-align:center;">Add your pick →</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══════════════════ OFFER FLOWS ═══════════════════ -->
+<div class="section-label">09 · Offers & Business</div>
+<div class="phones-row">
+
+  <!-- Accept Offer Sheet -->
+  <div>
+    <div class="phone-label">Accept Offer (Sheet)</div>
+    <div class="phone">
+      <div class="status-bar"><span>9:41</span><span>●●●</span></div>
+      <div style="flex:1; background:var(--bg);"></div>
+      <div style="background:white; border-radius:32px 32px 0 0; padding:0 24px 40px; box-shadow: 0 -4px 32px rgba(26,42,36,0.12);">
+        <div class="sheet-handle"></div>
+        <div class="offer-brand">☕</div>
+        <div class="pill pill-gold" style="margin-bottom:12px;">✦ Exclusive Offer</div>
+        <div class="offer-title">Shoebox Coffee</div>
+        <div class="offer-sub">Write a pick about us and earn TrustCoins. Honest reviews only.</div>
+        <div class="reward-card">
+          <div class="reward-icon">🪙</div>
+          <div>
+            <div class="reward-label">Reward for this pick</div>
+            <div class="reward-amount">120 TrustCoins</div>
+          </div>
+        </div>
+        <div style="background:var(--surf); border-radius:16px; padding:14px 16px; margin-bottom:20px;">
+          <div class="requirement-row">
+            <span class="req-label">Minimum TrustScore</span>
+            <span class="req-value">6.0 <span class="req-check">✓</span></span>
+          </div>
+          <div class="requirement-row" style="margin-bottom:0;">
+            <span class="req-label">Deadline</span>
+            <span class="req-value">7 days</span>
+          </div>
+        </div>
+        <div class="grad-btn">Accept offer</div>
+        <div style="text-align:center; font-size:13px; color:var(--muted); margin-top:12px;">You keep 100% of coins</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Collection Detail -->
+  <div>
+    <div class="phone-label">Collection Detail</div>
+    <div class="phone">
+      <div class="status-bar"><span>9:41</span><span>●●●</span></div>
+      <div style="flex:1; background:var(--bg); display:flex; flex-direction:column;">
+        <div class="detail-topbar" style="background:var(--bg); border:none;">
+          <span class="back-btn">←</span>
+          <span style="font-family:'Syne',sans-serif; font-size:16px; font-weight:700; color:var(--dark);">Collection</span>
+          <div style="margin-left:auto; font-size:20px;">⋯</div>
+        </div>
+        <div class="collection-header">
+          <div class="pill pill-violet" style="margin-bottom:10px;">📂 8 picks</div>
+          <div class="collection-title">Best Coffee in Moscow</div>
+          <div class="collection-sub">By Stepan · Updated 2 days ago</div>
+          <div class="collection-cover">
+            <div class="cover-main img-coffee">☕</div>
+            <div class="cover-side">
+              <div class="cover-sm img-violet">🫖</div>
+              <div class="cover-sm img-place">🌿</div>
+            </div>
+          </div>
+        </div>
+        <div style="padding:14px 20px; flex:1; overflow:hidden;">
+          <div class="post-card" style="margin-bottom:10px;">
+            <div style="display:flex; align-items:center; gap:12px; padding:14px 16px;">
+              <div style="width:52px;height:52px;border-radius:12px;background:linear-gradient(135deg,#F5E6D3,#EDD5B3);display:flex;align-items:center;justify-content:center;font-size:24px;">☕</div>
+              <div style="flex:1;">
+                <div class="post-title" style="font-size:14px;">Shoebox Coffee</div>
+                <div class="loc-tag" style="margin:2px 0 0;">📍 Patriarshye</div>
+              </div>
+              <div class="ring-wrap">
+                <svg width="36" height="36" viewBox="0 0 40 40">
+                  <circle cx="20" cy="20" r="16" fill="none" stroke="#F0EEEB" stroke-width="3.5"/>
+                  <circle cx="20" cy="20" r="16" fill="none" stroke="url(#gc1)" stroke-width="3.5" stroke-dasharray="88 12" stroke-dashoffset="25" stroke-linecap="round"/>
+                  <defs><linearGradient id="gc1" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#7C6FE0"/><stop offset="100%" stop-color="#3BD4C0"/></linearGradient></defs>
+                  <text x="20" y="24" text-anchor="middle" font-family="Syne" font-size="10" font-weight="700" fill="#1A2A24">8.8</text>
+                </svg>
+              </div>
+            </div>
+          </div>
+          <div class="post-card" style="margin-bottom:10px;">
+            <div style="display:flex; align-items:center; gap:12px; padding:14px 16px;">
+              <div style="width:52px;height:52px;border-radius:12px;background:linear-gradient(135deg,#E3F2FD,#BBDEFB);display:flex;align-items:center;justify-content:center;font-size:24px;">☕</div>
+              <div style="flex:1;">
+                <div class="post-title" style="font-size:14px;">Brew Station</div>
+                <div class="loc-tag" style="margin:2px 0 0;">📍 Chistye Prudy</div>
+              </div>
+              <div class="ring-wrap">
+                <svg width="36" height="36" viewBox="0 0 40 40">
+                  <circle cx="20" cy="20" r="16" fill="none" stroke="#F0EEEB" stroke-width="3.5"/>
+                  <circle cx="20" cy="20" r="16" fill="none" stroke="url(#gc2)" stroke-width="3.5" stroke-dasharray="72 28" stroke-dashoffset="25" stroke-linecap="round"/>
+                  <defs><linearGradient id="gc2" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#7C6FE0"/><stop offset="100%" stop-color="#3BD4C0"/></linearGradient></defs>
+                  <text x="20" y="24" text-anchor="middle" font-family="Syne" font-size="10" font-weight="700" fill="#1A2A24">7.2</text>
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

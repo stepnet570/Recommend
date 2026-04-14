@@ -65,7 +65,8 @@ fun acceptOffer(
 
         val offerUpdates = mutableMapOf<String, Any>(
             "acceptedCount" to FieldValue.increment(1L),
-            "acceptedBy" to FieldValue.arrayUnion(uid)
+            "acceptedBy" to FieldValue.arrayUnion(uid),
+            "promoterUserIds" to FieldValue.arrayUnion(uid)
         )
         if (newCount >= maxAcceptances) offerUpdates["status"] = "completed"
         transaction.update(offerRef, offerUpdates)

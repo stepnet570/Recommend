@@ -90,13 +90,13 @@ fun MainAppScreen(onLogout: () -> Unit) {
     }
 
     fun onNavItemClick(targetRoute: String) {
-        // Если в процессе создания и переходим на другой таб — предупреждаем
-        if (isInCreationFlow && currentRoute != targetRoute) {
+        // Read state directly at call time — avoids stale capture from last composition
+        val inFlow = isAskModalOpen || isActuallyCreating
+        if (inFlow && currentRoute != targetRoute) {
             pendingTab = targetRoute
             showExitCreationDialog = true
             return
         }
-        // Синхронный сброс всех оверлеев ДО навигации — нет мерцания
         resetOverlaysFn()
         navigateTo(targetRoute)
     }

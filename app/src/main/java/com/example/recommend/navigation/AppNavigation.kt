@@ -67,17 +67,13 @@ fun AppNavigation(
     var createCampaignOverlay by remember { mutableStateOf(false) }
     var linkedRequestIdForAdd by remember { mutableStateOf<String?>(null) }
     var linkedOfferIdForAdd by remember { mutableStateOf<String?>(null) }
+    var linkedOfferTitleForAdd by remember { mutableStateOf<String?>(null) }
     var activeOffer by remember { mutableStateOf<AdOffer?>(null) }
     var addPickForRequestId by remember { mutableStateOf<String?>(null) }
     var selectedOfferId by remember { mutableStateOf<String?>(null) }
     var profileOfferCache by remember { mutableStateOf<AdOffer?>(null) }
     var profileSurfaceOrdinal by rememberSaveable { mutableIntStateOf(0) }
     var viewedUserProfile by remember { mutableStateOf<UserProfile?>(null) }
-    val acceptedOfferIds = remember(feedOffersForHome, currentUserProfile?.uid) {
-        val uid = currentUserProfile?.uid ?: return@remember emptySet<String>()
-        feedOffersForHome.filter { uid in it.acceptedBy }.map { it.id }.toSet()
-    }
-
     // Reset business sub-destination when leaving add tab
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
     LaunchedEffect(currentRoute) {
@@ -120,6 +116,8 @@ fun AppNavigation(
             addPickForRequestId = null
             activeOffer = null
             createCampaignOverlay = false
+            linkedOfferIdForAdd = null
+            linkedOfferTitleForAdd = null
             onAskModalOpenChange(false)
         }
     }
@@ -201,6 +199,7 @@ fun AppNavigation(
                             onPostAdded = {
                                 linkedRequestIdForAdd = null
                                 linkedOfferIdForAdd = null
+                                linkedOfferTitleForAdd = null
                                 businessAddDestination = BusinessAddDestination.Hub
                                 navController.navigate("feed")
                             },
@@ -208,6 +207,7 @@ fun AppNavigation(
                             onBack = { businessAddDestination = BusinessAddDestination.Hub },
                             requestId = linkedRequestIdForAdd,
                             offerId = linkedOfferIdForAdd,
+                            offerTitle = linkedOfferTitleForAdd,
                             isSponsored = linkedOfferIdForAdd != null
                         )
                     }
@@ -216,11 +216,13 @@ fun AppNavigation(
                         onPostAdded = {
                             linkedRequestIdForAdd = null
                             linkedOfferIdForAdd = null
+                            linkedOfferTitleForAdd = null
                             navController.navigate("feed")
                         },
                         currentUserProfile = currentUserProfile,
                         requestId = linkedRequestIdForAdd,
                         offerId = linkedOfferIdForAdd,
+                        offerTitle = linkedOfferTitleForAdd,
                         isSponsored = linkedOfferIdForAdd != null
                     )
                 }
@@ -393,11 +395,16 @@ fun AppNavigation(
             AcceptOfferSheet(
                 offer = activeOffer!!,
                 viewerUid = currentUser.uid,
-                isAccepted = activeOffer!!.id in acceptedOfferIds,
+                isAccepted = currentUser.uid in activeOffer!!.acceptedBy,
                 onDismiss = { activeOffer = null },
-                onAccepted = { offerId, _, _ ->
-                    activeOffer = null
+                onAccepted = { offerId, offerTitle, _ ->
                     linkedOfferIdForAdd = offerId
+                    linkedOfferTitleForAdd = offerTitle
+                    activeOffer = null
+                    // Business users go directly to post form, not Hub
+                    if (currentUserProfile?.isBusiness == true) {
+                        businessAddDestination = BusinessAddDestination.Post
+                    }
                     navController.navigate("add") { launchSingleTop = true }
                 }
             )

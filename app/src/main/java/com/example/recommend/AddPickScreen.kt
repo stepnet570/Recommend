@@ -288,14 +288,13 @@ fun AddPickScreen(
                             color = DarkPastelAnthracite.copy(alpha = 0.45f)
                         )
                         Spacer(modifier = Modifier.height(8.dp))
-                        OutlinedTextField(
+                        AppTextField(
                             value = title,
                             onValueChange = { title = it },
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(14.dp),
+                            placeholder = "Name of the place or tip",
                             singleLine = true,
-                            placeholder = { Text("Name of the place or tip") },
-                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = scheme.primary),
+                            shape = RoundedCornerShape(14.dp),
                             enabled = !isUploading
                         )
 
@@ -306,14 +305,14 @@ fun AddPickScreen(
                             color = DarkPastelAnthracite.copy(alpha = 0.45f)
                         )
                         Spacer(modifier = Modifier.height(8.dp))
-                        OutlinedTextField(
+                        AppTextField(
                             value = description,
                             onValueChange = { description = it },
                             modifier = Modifier.fillMaxWidth(),
+                            placeholder = "Why you recommend it…",
+                            singleLine = false,
                             minLines = 3,
                             shape = RoundedCornerShape(14.dp),
-                            placeholder = { Text("Why you recommend it…") },
-                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = scheme.primary),
                             enabled = !isUploading
                         )
 
@@ -324,14 +323,13 @@ fun AddPickScreen(
                             color = DarkPastelAnthracite.copy(alpha = 0.45f)
                         )
                         Spacer(modifier = Modifier.height(8.dp))
-                        OutlinedTextField(
+                        AppTextField(
                             value = resourceUrl,
                             onValueChange = { resourceUrl = it },
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(14.dp),
+                            placeholder = "https://…",
                             singleLine = true,
-                            placeholder = { Text("https://…") },
-                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = scheme.primary),
+                            shape = RoundedCornerShape(14.dp),
                             enabled = !isUploading
                         )
                     }

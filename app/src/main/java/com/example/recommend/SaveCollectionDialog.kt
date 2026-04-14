@@ -1,6 +1,7 @@
 package com.example.recommend
 
 import com.example.recommend.data.model.*
+import com.example.recommend.ui.theme.*
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -21,7 +22,6 @@ import androidx.compose.ui.window.Dialog
 import com.example.recommend.ui.theme.AppTextStyles
 import com.example.recommend.ui.theme.DarkPastelAnthracite
 import com.example.recommend.ui.theme.MutedPastelTeal
-import com.example.recommend.ui.theme.SurfaceMuted
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -153,7 +153,7 @@ fun SaveCollectionDialog(
                                     }
                                 },
                             shape = RoundedCornerShape(12.dp),
-                            color = if (isSaved) SurfaceMuted else Color(0xFFF5F5F5)
+                            color = if (isSaved) SurfaceMuted else AppWhite
                         ) {
                             Row(
                                 modifier = Modifier.padding(16.dp),

@@ -3,10 +3,12 @@ import com.example.recommend.ui.feed.*
 import com.example.recommend.ui.profile.*
 
 import com.example.recommend.data.model.*
+import com.example.recommend.ui.theme.*
 
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -42,6 +44,10 @@ import com.example.recommend.ui.theme.MutedPastelGold
 import com.example.recommend.ui.theme.MutedPastelTeal
 import com.example.recommend.ui.theme.RichPastelCoral
 import com.example.recommend.ui.theme.SurfaceMuted
+import com.example.recommend.ui.theme.AppLime
+import com.example.recommend.ui.theme.AppTeal
+import com.example.recommend.ui.theme.AppDark
+import com.example.recommend.ui.theme.PrimaryGradientLinear
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
@@ -252,7 +258,7 @@ fun PublicUserProfileScreen(
                             Text(profile.name, style = AppTextStyles.Heading2.copy(fontSize = 24.sp))
                             Text(
                                 profile.handle,
-                                color = RichPastelCoral,
+                                color = DarkPastelAnthracite.copy(alpha = 0.55f),
                                 style = AppTextStyles.BodyMedium,
                                 fontWeight = FontWeight.Medium
                             )
@@ -276,37 +282,6 @@ fun PublicUserProfileScreen(
                                     fontSize = 12.sp,
                                     modifier = Modifier.padding(start = 4.dp)
                                 )
-                            }
-
-                            if (!isOwnProfile && viewerProfile != null) {
-                                Spacer(modifier = Modifier.height(14.dp))
-                                Text(
-                                    "Your rating for this person",
-                                    style = AppTextStyles.BodySmall,
-                                    color = DarkPastelAnthracite.copy(alpha = 0.55f),
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                val myUserRating = profile.trustRatings[viewerUid] ?: 0
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.Center,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    for (star in 1..5) {
-                                        val selected = myUserRating >= star
-                                        Icon(
-                                            Icons.Filled.Star,
-                                            contentDescription = "Rate $star",
-                                            tint = if (selected) MutedPastelGold else SurfaceMuted,
-                                            modifier = Modifier
-                                                .size(36.dp)
-                                                .clickable { submitUserTrustRating(star) }
-                                        )
-                                        if (star < 5) Spacer(modifier = Modifier.width(6.dp))
-                                    }
-                                }
                             }
 
                             when (profileSurface) {
@@ -354,28 +329,37 @@ fun PublicUserProfileScreen(
                                     )
 
                                     Spacer(modifier = Modifier.height(20.dp))
-                                    OutlinedButton(
-                                        onClick = { profileSurfaceOrdinal = 1 },
+                                    Box(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .height(50.dp),
-                                        shape = RoundedCornerShape(16.dp),
-                                        border = BorderStroke(1.dp, MutedPastelTeal),
-                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MutedPastelTeal)
+                                            .height(50.dp)
+                                            .clip(RoundedCornerShape(16.dp))
+                                            .border(
+                                                width = 1.5.dp,
+                                                brush = PrimaryGradient,
+                                                shape = RoundedCornerShape(16.dp)
+                                            )
+                                            .clickable { profileSurfaceOrdinal = 1 },
+                                        contentAlignment = Alignment.Center
                                     ) {
-                                        Text(
-                                            "View ad campaigns",
-                                            style = AppTextStyles.BodyMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MutedPastelTeal
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Icon(
-                                            Icons.AutoMirrored.Filled.ArrowForward,
-                                            contentDescription = null,
-                                            tint = MutedPastelTeal,
-                                            modifier = Modifier.size(20.dp)
-                                        )
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.Center
+                                        ) {
+                                            Text(
+                                                "View ad campaigns",
+                                                style = AppTextStyles.BodyMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = DarkPastelAnthracite
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Icon(
+                                                Icons.AutoMirrored.Filled.ArrowForward,
+                                                contentDescription = null,
+                                                tint = DarkPastelAnthracite,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
                                     }
                                 }
 
@@ -470,23 +454,45 @@ fun PublicUserProfileScreen(
 
                             if (!isOwnProfile && viewerProfile != null) {
                                 Spacer(modifier = Modifier.height(18.dp))
-                                Button(
-                                    onClick = { toggleFollow() },
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(48.dp),
-                                    shape = RoundedCornerShape(16.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = if (isFollowing) SurfaceMuted else scheme.primary,
-                                        contentColor = if (isFollowing) DarkPastelAnthracite else scheme.onPrimary
-                                    )
-                                ) {
-                                    Text(
-                                        if (isFollowing) "Unfollow" else "Follow",
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 15.sp,
-                                        color = if (isFollowing) DarkPastelAnthracite else scheme.onPrimary
-                                    )
+                                if (isFollowing) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(50.dp)
+                                            .clip(RoundedCornerShape(16.dp))
+                                            .border(
+                                                width = 1.5.dp,
+                                                brush = PrimaryGradientLinear,
+                                                shape = RoundedCornerShape(16.dp)
+                                            )
+                                            .background(Color.White)
+                                            .clickable { toggleFollow() },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            "Unfollow",
+                                            color = AppDark,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 16.sp
+                                        )
+                                    }
+                                } else {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(50.dp)
+                                            .clip(RoundedCornerShape(16.dp))
+                                            .background(PrimaryGradientLinear)
+                                            .clickable { toggleFollow() },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            "Follow",
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 16.sp
+                                        )
+                                    }
                                 }
                             }
                         }

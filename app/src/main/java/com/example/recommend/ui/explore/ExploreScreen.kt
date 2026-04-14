@@ -1,6 +1,7 @@
 package com.example.recommend.ui.explore
 
 import com.example.recommend.*
+import com.example.recommend.ui.theme.*
 import com.example.recommend.data.model.*
 
 import androidx.compose.foundation.BorderStroke
@@ -30,6 +31,8 @@ import com.example.recommend.ui.theme.MutedPastelTeal
 import com.example.recommend.ui.theme.RichPastelCoral
 import com.example.recommend.ui.theme.SoftPastelMint
 import com.example.recommend.ui.theme.SurfaceMuted
+import com.example.recommend.ui.theme.AppDark
+import com.example.recommend.ui.theme.PrimaryGradient
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -90,7 +93,7 @@ fun ExploreScreen(onUserProfileClick: (String) -> Unit = {}) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(SoftPastelMint)
+            .background(Color.White)
             .padding(horizontal = 16.dp)
             .padding(top = 24.dp)
     ) {
@@ -152,7 +155,7 @@ fun ExploreScreen(onUserProfileClick: (String) -> Unit = {}) {
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column {
                                     Text(otherUser.name, style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                                    Text(otherUser.handle, color = Color(0xFF2D3A36), style = AppTextStyles.BodySmall, fontWeight = FontWeight.Medium)
+                                    Text(otherUser.handle, color = AppDark, style = AppTextStyles.BodySmall, fontWeight = FontWeight.Medium)
                                     if (otherUser.bio.isNotEmpty()) {
                                         Text(otherUser.bio, style = AppTextStyles.BodySmall, color = DarkPastelAnthracite.copy(alpha = 0.55f), maxLines = 1, modifier = Modifier.padding(top = 2.dp))
                                     }
@@ -165,7 +168,7 @@ fun ExploreScreen(onUserProfileClick: (String) -> Unit = {}) {
                                 Box(
                                     modifier = Modifier
                                         .background(
-                                            brush = Brush.horizontalGradient(listOf(Color(0xFF7AE23A), Color(0xFF3BD4C0))),
+                                            brush = PrimaryGradient,
                                             shape = RoundedCornerShape(12.dp)
                                         )
                                         .padding(1.5.dp)
@@ -178,14 +181,14 @@ fun ExploreScreen(onUserProfileClick: (String) -> Unit = {}) {
                                         "Unfollow",
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 12.sp,
-                                        color = Color(0xFF2D3A36)
+                                        color = AppDark
                                     )
                                 }
                             } else {
                                 Button(
                                     onClick = { toggleFollow(otherUser.uid) },
                                     modifier = Modifier.background(
-                                        brush = Brush.horizontalGradient(listOf(Color(0xFF7AE23A), Color(0xFF3BD4C0))),
+                                        brush = PrimaryGradient,
                                         shape = RoundedCornerShape(12.dp)
                                     ),
                                     colors = ButtonDefaults.buttonColors(

@@ -10,6 +10,10 @@ val AppGold = Color(0xFFD4AF37)
 val AppBorder = Color(0x263BD4C0)
 val AppSurface = Color(0xFF1A3328)
 val AppWhite = Color(0xFFFFFFFF)
+val AppError = Color(0xFFCC4444)
+val AppErrorContainer = Color(0xFFFFEEED)
+val AppDisabled = Color(0xFFE8E8E8)
+val AppOnDisabled = Color(0xFF9E9E9E)
 
 val SoftPastelMint = AppBackground
 val DarkPastelAnthracite = AppDark

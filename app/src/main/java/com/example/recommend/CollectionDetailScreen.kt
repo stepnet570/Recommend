@@ -20,7 +20,6 @@ import androidx.compose.ui.unit.sp
 import com.example.recommend.ui.theme.AppTextStyles
 import com.example.recommend.ui.theme.DarkPastelAnthracite
 import com.example.recommend.ui.theme.MutedPastelTeal
-import com.example.recommend.ui.theme.SoftPastelMint
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,7 +51,7 @@ fun CollectionDetailScreen(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
             )
         },
-        containerColor = SoftPastelMint
+        containerColor = Color.White
     ) { paddingValues ->
         if (posts.isEmpty()) {
             Box(

@@ -1,6 +1,7 @@
 package com.example.recommend
 
 import androidx.compose.foundation.background
+import com.example.recommend.ui.theme.*
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,9 +19,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.recommend.ui.theme.AppTextStyles
 import com.example.recommend.ui.theme.DarkPastelAnthracite
-import com.example.recommend.ui.theme.MutedPastelTeal
-import com.example.recommend.ui.theme.RichPastelCoral
 import com.example.recommend.ui.theme.SoftPastelMint
+import com.example.recommend.ui.theme.AppDark
 
 @Composable
 fun AddHubScreen(
@@ -48,14 +48,14 @@ fun AddHubScreen(
         )
 
         HubChoiceCard(
-            icon = { Icon(Icons.Filled.Campaign, null, tint = RichPastelCoral, modifier = Modifier.size(40.dp)) },
+            icon = { Icon(Icons.Filled.Campaign, null, tint = AppDark, modifier = Modifier.size(40.dp)) },
             title = "Ad campaign",
             subtitle = "Launch an offer and reward users with TrustCoins",
             onClick = onCampaign
         )
         Spacer(modifier = Modifier.height(16.dp))
         HubChoiceCard(
-            icon = { Icon(Icons.Filled.Edit, null, tint = MutedPastelTeal, modifier = Modifier.size(40.dp)) },
+            icon = { Icon(Icons.Filled.Edit, null, tint = AppDark, modifier = Modifier.size(40.dp)) },
             title = "Recommendation post",
             subtitle = "Share a place or service you trust",
             onClick = onPost

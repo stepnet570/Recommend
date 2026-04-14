@@ -28,15 +28,36 @@
 
 ## 🎨 Дизайн-система "Artisan Pastel"
 
-```kotlin
-Surface (Фон):        #F0FAF5  // SoftPastelMint
-On-Surface (Текст):   #2D3A36  // DarkPastelAnthracite
-Primary (Кнопки):     #FF7C6B  // RichPastelCoral
-Secondary (Иконки):   #6EBFD6  // MutedPastelTeal
-Gold (Монетизация):   #D4AF37  // MutedPastelGold
+> ⚠️ Реальные токены из `ui/theme/Color.kt` — используй только их, не CLAUDE.md как источник правды.
 
-Заголовки: Syne (геометрический)
-Текст:     DM Sans
+```kotlin
+// ui/theme/Color.kt — актуальные значения
+val AppLime       = Color(0xFF7AE23A)  // градиент-старт, активные иконки
+val AppTeal       = Color(0xFF3BD4C0)  // градиент-конец, Primary-кнопки
+val AppDark       = Color(0xFF1A2A24)  // DarkPastelAnthracite — основной текст
+val AppBackground = Color(0xFFF6FEFB)  // SoftPastelMint — фон экранов
+val AppMuted      = Color(0xFF6B8C80)  // MutedPastelTeal — второстепенный текст
+val AppGold       = Color(0xFFD4AF37)  // MutedPastelGold — монетизация, TrustCoins
+val AppBorder     = Color(0x263BD4C0)  // полупрозрачный Teal для обводок
+val AppSurface    = Color(0xFF1A3328)  // тёмная поверхность (тёмные карточки)
+val AppWhite      = Color(0xFFFFFFFF)  // белые карточки/оверлеи
+val SurfaceMuted  = Color(0xFFE8F5F0)  // светло-зелёный фон секций
+
+// Градиент (используется везде: кнопки, активные иконки, FAB)
+Brush.horizontalGradient(listOf(AppLime, AppTeal))  // #7AE23A → #3BD4C0
+
+// Типографика
+Заголовки: Syne (HeadingFontFamily) — R.font.syne_variable
+Текст:     DM Sans (BodyFontFamily)  — R.font.dm_sans_variable
+```
+
+**Алиасы в коде (для совместимости):**
+```kotlin
+SoftPastelMint      = AppBackground  // #F6FEFB
+DarkPastelAnthracite = AppDark       // #1A2A24
+RichPastelCoral     = AppTeal        // #3BD4C0 (исторически — это Teal, не Coral!)
+MutedPastelTeal     = AppMuted       // #6B8C80
+MutedPastelGold     = AppGold        // #D4AF37
 ```
 
 ---
@@ -49,7 +70,14 @@ Gold (Монетизация):   #D4AF37  // MutedPastelGold
 - CreateOfferScreen — бизнес создаёт AdOffer
 - AddHubScreen — хаб для бизнес-аккаунта (пост или кампания)
 - MainAppScreen — навигация + маршрутизация по ролям (isBusiness)
+- AcceptOfferSheet — флоу принятия оффера
+- PostDetailScreen, RequestDetailScreen, CollectionDetailScreen — детальные экраны
+- PublicUserProfileScreen — публичный профиль другого пользователя
+- BusinessOfferDetailScreen — детали кампании для бизнеса
 - Firebase Auth + Firestore CRUD
+- FirestorePaths — централизованный путь к данным
+- Data-слой: PostRepository, UserRepository, OfferRepository, RequestRepository, CollectionRepository
+- Модели: Post, UserProfile, AdOffer, PackRequest, PostCollection, Answer
 
 ---
 
@@ -124,14 +152,22 @@ Gold (Монетизация):   #D4AF37  // MutedPastelGold
 ## 📁 Ключевые файлы
 ```
 app/src/main/java/com/example/recommend/
-├── MainAppScreen.kt      # Навигация и маршрутизация
-├── FeedScreen.kt         # Лента + Зов стаи + Офферы
-├── AddScreen.kt          # Создание поста
-├── ProfileScreen.kt      # Профиль
-├── ExploreScreen.kt      # Поиск
-├── CreateOfferScreen.kt  # Бизнес: создать кампанию
-├── AddHubScreen.kt       # Бизнес: хаб действий
-└── ui/theme/             # Цвета, шрифты, компоненты
+├── MainAppScreen.kt               # Bottom nav + dialog выхода из creation flow
+├── navigation/AppNavigation.kt    # NavHost + ВСЕ overlay-состояния (activeRequest, openPostId и т.д.)
+├── ui/feed/FeedScreen.kt          # Лента + Зов стаи + Офферы
+├── ui/feed/FeedViewModel.kt       # Все данные для Feed + текущий пользователь
+├── ui/add/AddScreen.kt            # Создание поста
+├── ui/profile/ProfileScreen.kt    # Профиль
+├── ui/profile/ProfileViewModel.kt # Данные профиля
+├── ui/explore/ExploreScreen.kt    # Поиск
+├── ui/auth/AuthScreen.kt          # Авторизация
+├── CreateOfferScreen.kt           # Бизнес: создать кампанию
+├── AddHubScreen.kt                # Бизнес: хаб действий
+├── AcceptOfferSheet.kt            # Принятие оффера (bottom sheet)
+├── FirestorePaths.kt              # Единый путь к данным Firestore
+├── data/model/                    # Post, UserProfile, AdOffer, PackRequest, PostCollection
+├── data/repository/               # PostRepository, UserRepository, OfferRepository, ...
+└── ui/theme/                      # Color.kt, Type.kt, Theme.kt, Convex.kt
 ```
 
 ---
@@ -139,5 +175,19 @@ app/src/main/java/com/example/recommend/
 ## 🚨 Важные ограничения
 - **НЕ менять** путь Firestore (`trustlist-production`)
 - **НЕ использовать** XML layouts — только Compose
-- **НЕ хардкодить** цвета — только из `ui/theme/`
+- **НЕ хардкодить** цвета — только из `ui/theme/Color.kt` (переменные `App*`)
+- **НЕ хардкодить** `Color(0xFF...)` инлайн — только именованные токены
 - Firebase project ID: `trustlist-fc435`
+
+---
+
+## ⚠️ Известный технический долг (учитывай при разработке)
+
+| Проблема | Где | Влияние |
+|----------|-----|---------|
+| Лента не фильтрует по `following` | `FeedViewModel.feedPostsForHome` | Соцграф не работает |
+| Нет пагинации | `PostRepository`, `UserRepository` | Масштабируемость |
+| 20+ параметров в `AppNavigation` | `navigation/AppNavigation.kt` | Сложность поддержки |
+| `authorName = "Alex"` дефолт | `data/model/Post.kt` | Баги в продакшене |
+| `isMinifyEnabled = false` в release | `app/build.gradle.kts` | Размер APK, безопасность |
+| `applicationId = "com.example.recommend"` | `app/build.gradle.kts` | Нужно сменить до релиза |

@@ -1,9 +1,13 @@
 package com.example.recommend.navigation
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.runtime.*
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -44,13 +48,16 @@ fun AppNavigation(
     myOffers: List<AdOffer>,
     followersCount: Int,
     participatingPromoCampaignsCount: Int,
+    isAskModalOpen: Boolean = false,
+    onAskModalOpenChange: (Boolean) -> Unit = {},
+    onRegisterReset: (() -> Unit) -> Unit = {},
+    onCreationFlowActive: (Boolean) -> Unit = {},
     onLogout: () -> Unit
 ) {
     val db = FirebaseFirestore.getInstance()
     val currentUser = FirebaseAuth.getInstance().currentUser
 
     // --- overlay state ---
-    var isAskModalOpen by remember { mutableStateOf(false) }
     var activeRequest by remember { mutableStateOf<PackRequest?>(null) }
     var postToSave by remember { mutableStateOf<String?>(null) }
     var activeCollection by remember { mutableStateOf<PostCollection?>(null) }
@@ -59,15 +66,32 @@ fun AppNavigation(
     var openPostId by remember { mutableStateOf<String?>(null) }
     var createCampaignOverlay by remember { mutableStateOf(false) }
     var linkedRequestIdForAdd by remember { mutableStateOf<String?>(null) }
+    var linkedOfferIdForAdd by remember { mutableStateOf<String?>(null) }
+    var activeOffer by remember { mutableStateOf<AdOffer?>(null) }
     var addPickForRequestId by remember { mutableStateOf<String?>(null) }
     var selectedOfferId by remember { mutableStateOf<String?>(null) }
     var profileOfferCache by remember { mutableStateOf<AdOffer?>(null) }
     var profileSurfaceOrdinal by rememberSaveable { mutableIntStateOf(0) }
+    var viewedUserProfile by remember { mutableStateOf<UserProfile?>(null) }
+    val acceptedOfferIds = remember(feedOffersForHome, currentUserProfile?.uid) {
+        val uid = currentUserProfile?.uid ?: return@remember emptySet<String>()
+        feedOffersForHome.filter { uid in it.acceptedBy }.map { it.id }.toSet()
+    }
 
     // Reset business sub-destination when leaving add tab
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
     LaunchedEffect(currentRoute) {
         if (currentRoute != "add") businessAddDestination = BusinessAddDestination.Hub
+    }
+
+    // Сообщаем родителю: пользователь реально в процессе создания (не на экране выбора Hub)
+    LaunchedEffect(currentRoute, businessAddDestination) {
+        val inFlow = when {
+            currentRoute != "add" -> false
+            currentUserProfile?.isBusiness == true -> businessAddDestination != BusinessAddDestination.Hub
+            else -> true  // обычный юзер на add — сразу в форме
+        }
+        onCreationFlowActive(inFlow)
     }
 
     // Clear stale selectedOfferId if the offer is no longer known
@@ -81,6 +105,23 @@ fun AppNavigation(
 
     LaunchedEffect(viewUserProfileId) {
         if (viewUserProfileId == null) profileOfferCache = null
+    }
+
+    // Регистрируем функцию сброса оверлеев в родителе (синхронный вызов без LaunchedEffect)
+    SideEffect {
+        onRegisterReset {
+            activeRequest = null
+            postToSave = null
+            activeCollection = null
+            viewUserProfileId = null
+            openPostId = null
+            selectedOfferId = null
+            profileOfferCache = null
+            addPickForRequestId = null
+            activeOffer = null
+            createCampaignOverlay = false
+            onAskModalOpenChange(false)
+        }
     }
 
     fun ratePost(postId: String, stars: Int) {
@@ -98,9 +139,20 @@ fun AppNavigation(
     }
 
     Box(modifier = modifier.fillMaxSize()) {
-        NavHost(navController = navController, startDestination = "feed") {
+        NavHost(
+            navController = navController,
+            startDestination = "feed",
+            enterTransition = { EnterTransition.None },
+            exitTransition = { ExitTransition.None },
+            popEnterTransition = { EnterTransition.None },
+            popExitTransition = { ExitTransition.None }
+        ) {
 
             composable("feed") {
+                val acceptedOfferIds = remember(feedOffersForHome, currentUser?.uid) {
+                    val uid = currentUser?.uid ?: return@remember emptySet()
+                    feedOffersForHome.filter { uid in it.acceptedBy }.map { it.id }.toSet()
+                }
                 FeedScreen(
                     posts = feedPostsForHome,
                     requests = feedRequests,
@@ -108,9 +160,11 @@ fun AppNavigation(
                     followingUserIds = currentUserProfile?.following?.toSet() ?: emptySet(),
                     savedPostIds = savedPostIds,
                     activeOffers = feedOffersForHome,
+                    acceptedOfferIds = acceptedOfferIds,
                     trustCoins = currentUserProfile?.trustCoins ?: 0,
-                    onOfferAccept = { offer -> selectedOfferId = offer.id },
-                    onAskPackClick = { isAskModalOpen = true },
+                    onOfferClick = { offer -> activeOffer = offer },
+                    onUserClick = { uid -> viewUserProfileId = uid },
+                    onAskPackClick = { onAskModalOpenChange(true) },
                     onRequestClick = { selectedRequest -> activeRequest = selectedRequest },
                     onSignalRequestOpen = { activeRequest = it },
                     onHelpRequest = { req -> addPickForRequestId = req.id },
@@ -146,22 +200,28 @@ fun AppNavigation(
                         BusinessAddDestination.Post -> AddScreen(
                             onPostAdded = {
                                 linkedRequestIdForAdd = null
+                                linkedOfferIdForAdd = null
                                 businessAddDestination = BusinessAddDestination.Hub
                                 navController.navigate("feed")
                             },
                             currentUserProfile = currentUserProfile,
                             onBack = { businessAddDestination = BusinessAddDestination.Hub },
-                            requestId = linkedRequestIdForAdd
+                            requestId = linkedRequestIdForAdd,
+                            offerId = linkedOfferIdForAdd,
+                            isSponsored = linkedOfferIdForAdd != null
                         )
                     }
                 } else {
                     AddScreen(
                         onPostAdded = {
                             linkedRequestIdForAdd = null
+                            linkedOfferIdForAdd = null
                             navController.navigate("feed")
                         },
                         currentUserProfile = currentUserProfile,
-                        requestId = linkedRequestIdForAdd
+                        requestId = linkedRequestIdForAdd,
+                        offerId = linkedOfferIdForAdd,
+                        isSponsored = linkedOfferIdForAdd != null
                     )
                 }
             }
@@ -192,7 +252,7 @@ fun AppNavigation(
 
         if (isAskModalOpen) {
             AskPackScreen(
-                onDismiss = { isAskModalOpen = false },
+                onDismiss = { onAskModalOpenChange(false) },
                 users = allUsers,
                 currentUserProfile = currentUserProfile
             )
@@ -201,7 +261,7 @@ fun AppNavigation(
         if (activeRequest != null) {
             val requestAuthor = allUsers.find { it.uid == activeRequest!!.userId }
                 ?: UserProfile(uid = activeRequest!!.userId, name = "Member")
-            Surface(modifier = Modifier.fillMaxSize().zIndex(5f), color = SoftPastelMint) {
+            Surface(modifier = Modifier.fillMaxSize().zIndex(5f), color = Color.White) {
                 RequestDetailScreen(
                     request = activeRequest!!,
                     requestAuthor = requestAuthor,
@@ -248,7 +308,8 @@ fun AppNavigation(
         }
 
         if (viewUserProfileId != null && currentUser != null) {
-            Surface(modifier = Modifier.fillMaxSize(), color = Color.White) {
+            BackHandler { viewUserProfileId = null }
+            Surface(modifier = Modifier.fillMaxSize().zIndex(7f), color = Color.White) {
                 PublicUserProfileScreen(
                     userId = viewUserProfileId!!,
                     viewerUid = currentUser.uid,
@@ -267,9 +328,10 @@ fun AppNavigation(
         }
 
         if (openPostId != null && currentUser != null) {
+            BackHandler { openPostId = null }
             val detailPost = posts.find { it.id == openPostId }
             if (detailPost != null) {
-                Surface(modifier = Modifier.fillMaxSize(), color = Color.White) {
+                Surface(modifier = Modifier.fillMaxSize().zIndex(7f), color = Color.White) {
                     PostDetailScreen(
                         post = detailPost,
                         users = allUsers,
@@ -290,7 +352,11 @@ fun AppNavigation(
                 ?: profileOfferCache?.takeIf { it.id == id }
         }
         if (offerForDetail != null) {
-            Surface(modifier = Modifier.fillMaxSize(), color = Color.White) {
+            BackHandler {
+                selectedOfferId = null
+                profileOfferCache = null
+            }
+            Surface(modifier = Modifier.fillMaxSize().zIndex(7f), color = Color.White) {
                 BusinessOfferDetailScreen(
                     offer = offerForDetail,
                     onBack = {
@@ -305,13 +371,36 @@ fun AppNavigation(
 
         val businessProfileForCampaign = currentUserProfile?.takeIf { it.isBusiness }
         if (createCampaignOverlay && businessProfileForCampaign != null) {
-            Surface(modifier = Modifier.fillMaxSize(), color = Color.White) {
+            Surface(modifier = Modifier.fillMaxSize().zIndex(8f), color = Color.White) {
                 CreateOfferScreen(
                     userProfile = businessProfileForCampaign,
                     onOfferCreated = { createCampaignOverlay = false },
                     onBack = { createCampaignOverlay = false }
                 )
             }
+        }
+
+        if (viewedUserProfile != null) {
+            Box(modifier = Modifier.fillMaxSize().zIndex(10f)) {
+                UserProfileBottomSheet(
+                    userProfile = viewedUserProfile!!,
+                    onDismiss = { viewedUserProfile = null }
+                )
+            }
+        }
+
+        if (activeOffer != null && currentUser != null) {
+            AcceptOfferSheet(
+                offer = activeOffer!!,
+                viewerUid = currentUser.uid,
+                isAccepted = activeOffer!!.id in acceptedOfferIds,
+                onDismiss = { activeOffer = null },
+                onAccepted = { offerId, _, _ ->
+                    activeOffer = null
+                    linkedOfferIdForAdd = offerId
+                    navController.navigate("add") { launchSingleTop = true }
+                }
+            )
         }
     }
 }

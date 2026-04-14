@@ -1,6 +1,7 @@
 package com.example.recommend
 
 import com.example.recommend.data.model.*
+import com.example.recommend.ui.theme.*
 
 import android.net.Uri
 import android.os.Handler
@@ -39,6 +40,8 @@ import com.example.recommend.ui.theme.MutedPastelTeal
 import com.example.recommend.ui.theme.SoftPastelMint
 import com.example.recommend.ui.theme.SurfaceMuted
 import com.example.recommend.ui.theme.PrimaryGradient
+import com.example.recommend.ui.theme.AppDark
+import com.example.recommend.ui.theme.SurfaceMuted as SurfaceMutedAlias
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
@@ -345,16 +348,16 @@ fun AddPickScreen(
                     enabled = !isUploading && title.isNotBlank(),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color.Transparent,
-                        contentColor = Color(0xFF1A2A24),
-                        disabledContainerColor = Color(0xFFE8F5F0),
-                        disabledContentColor = Color(0xFF6B8C80)
+                        contentColor = AppDark,
+                        disabledContainerColor = SurfaceMutedAlias,
+                        disabledContentColor = MutedPastelTeal
                     ),
                     shape = RoundedCornerShape(16.dp)
                 ) {
                     if (isUploading) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(24.dp),
-                            color = Color(0xFF1A2A24),
+                            color = AppDark,
                             strokeWidth = 2.dp
                         )
                     } else {
@@ -363,7 +366,7 @@ fun AddPickScreen(
                             fontFamily = BodyFontFamily,
                             fontWeight = FontWeight.Bold,
                             fontSize = 16.sp,
-                            color = Color(0xFF1A2A24)
+                            color = AppDark
                         )
                     }
                 }

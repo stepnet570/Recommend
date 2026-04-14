@@ -1,6 +1,7 @@
 package com.example.recommend.ui.auth
 
 import com.example.recommend.*
+import com.example.recommend.ui.theme.*
 import com.example.recommend.data.model.*
 
 import android.util.Log
@@ -29,6 +30,8 @@ import com.example.recommend.ui.theme.DarkPastelAnthracite
 import com.example.recommend.ui.theme.MutedPastelTeal
 import com.example.recommend.ui.theme.ConvexCardBox
 import com.example.recommend.ui.theme.SoftPastelMint
+import com.example.recommend.ui.theme.AppError
+import com.example.recommend.ui.theme.AppErrorContainer
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthException
 import com.google.firebase.auth.UserProfileChangeRequest
@@ -211,13 +214,13 @@ fun AuthScreen(onAuthSuccess: () -> Unit) {
                 AnimatedVisibility(visible = errorMessage.isNotEmpty()) {
                     Text(
                         text = errorMessage,
-                        color = Color(0xFFCC4444),
+                        color = AppError,
                         style = AppTextStyles.BodyMedium,
                         textAlign = TextAlign.Center,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(bottom = 16.dp)
-                            .background(Color(0xFFFFEEED), RoundedCornerShape(12.dp))
+                            .background(AppErrorContainer, RoundedCornerShape(12.dp))
                             .padding(12.dp)
                     )
                 }

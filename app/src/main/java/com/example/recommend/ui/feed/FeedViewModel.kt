@@ -79,13 +79,21 @@ class FeedViewModel : ViewModel() {
         .map { posts -> posts.filter { it.replyToRequestId.isNullOrBlank() } }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
-    /** Active offers from other businesses — shown in the feed carousel. */
-    val feedOffersForHome: StateFlow<List<AdOffer>> = _activeOffers
-        .map { offers ->
-            val uid = currentUid
-            if (uid.isNullOrBlank()) offers else offers.filter { it.businessId != uid }
+    /**
+     * Active offers shown in the feed carousel.
+     * Filtered by two criteria only:
+     *  1. minTrustScore — user must meet the offer's minimum trust score
+     *  2. own campaigns excluded — don't show a business its own offers
+     * No isBusiness gate — all account types see qualifying offers.
+     */
+    val feedOffersForHome: StateFlow<List<AdOffer>> = combine(_activeOffers, _currentUser) { offers, currentUser ->
+        val uid = currentUser?.uid
+        val userTrustScore = currentUser?.trustScore ?: 0.0
+        offers.filter {
+            (uid == null || it.businessId != uid) &&
+            it.minTrustScore <= userTrustScore
         }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     init {
         val uid = currentUid

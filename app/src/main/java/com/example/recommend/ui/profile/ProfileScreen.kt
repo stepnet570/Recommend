@@ -11,7 +11,6 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -32,34 +31,25 @@ import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
+
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.example.recommend.ui.theme.AppTextStyles
-import com.example.recommend.ui.theme.DarkPastelAnthracite
-import com.example.recommend.ui.theme.MutedPastelGold
-import com.example.recommend.ui.theme.MutedPastelTeal
-import com.example.recommend.ui.theme.RichPastelCoral
-import com.example.recommend.ui.theme.ConvexCardBox
-import com.example.recommend.ui.theme.GradientMid
-import com.example.recommend.ui.theme.GradientTop
-import com.example.recommend.ui.theme.SurfaceMuted
-import com.example.recommend.ui.theme.SurfacePastel
-import com.example.recommend.ui.theme.AppDark
-import com.example.recommend.ui.theme.PrimaryGradient
+import com.example.recommend.ui.feed.TrustScoreRing
+import com.example.recommend.ui.feed.categoryStyle
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
@@ -67,10 +57,7 @@ import com.google.firebase.storage.StorageMetadata
 import java.util.Locale
 import java.util.concurrent.Executors
 
-private enum class ProfileSurface {
-    PERSONAL,
-    ADS_CAMPAIGNS
-}
+// ─── ProfileScreen ────────────────────────────────────────────────────────────
 
 @Composable
 fun ProfileScreen(
@@ -108,432 +95,511 @@ fun ProfileScreen(
         isAvatarUploading = true
         compressExecutor.execute {
             val bytes = ImageCompress.compressUriToJpeg(
-                context,
-                uri,
+                context, uri,
                 ImageCompress.AVATAR_MAX_SIDE_PX,
                 ImageCompress.AVATAR_JPEG_QUALITY
             )
             if (bytes == null || bytes.isEmpty()) {
-                mainHandler.post {
-                    isAvatarUploading = false
-                    Toast.makeText(context, "Could not process image", Toast.LENGTH_SHORT).show()
-                }
+                mainHandler.post { isAvatarUploading = false; Toast.makeText(context, "Could not process image", Toast.LENGTH_SHORT).show() }
                 return@execute
             }
             val ref = storage.reference.child("avatars/$uid/avatar.jpg")
             val metadata = StorageMetadata.Builder().setContentType("image/jpeg").build()
             ref.putBytes(bytes, metadata)
                 .addOnSuccessListener {
-                    ref.downloadUrl
-                        .addOnSuccessListener { downloadUri ->
-                            db.trustListDataRoot()
-                                .collection("users").document(uid)
-                                .update("avatar", downloadUri.toString())
-                                .addOnSuccessListener {
-                                    mainHandler.post {
-                                        isAvatarUploading = false
-                                        Toast.makeText(context, "Photo updated", Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                                .addOnFailureListener { e ->
-                                    mainHandler.post {
-                                        isAvatarUploading = false
-                                        Toast.makeText(context, "Save failed: ${e.message}", Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                        }
-                        .addOnFailureListener { e ->
-                            mainHandler.post {
-                                isAvatarUploading = false
-                                Toast.makeText(context, "URL failed: ${e.message}", Toast.LENGTH_SHORT).show()
-                            }
-                        }
+                    ref.downloadUrl.addOnSuccessListener { downloadUri ->
+                        db.trustListDataRoot().collection("users").document(uid)
+                            .update("avatar", downloadUri.toString())
+                            .addOnSuccessListener { mainHandler.post { isAvatarUploading = false; Toast.makeText(context, "Photo updated", Toast.LENGTH_SHORT).show() } }
+                            .addOnFailureListener { e -> mainHandler.post { isAvatarUploading = false; Toast.makeText(context, "Save failed: ${e.message}", Toast.LENGTH_SHORT).show() } }
+                    }.addOnFailureListener { e -> mainHandler.post { isAvatarUploading = false; Toast.makeText(context, "URL failed: ${e.message}", Toast.LENGTH_SHORT).show() } }
                 }
-                .addOnFailureListener { e ->
-                    mainHandler.post {
-                        isAvatarUploading = false
-                        Toast.makeText(context, "Upload failed: ${e.message}", Toast.LENGTH_SHORT).show()
-                    }
-                }
+                .addOnFailureListener { e -> mainHandler.post { isAvatarUploading = false; Toast.makeText(context, "Upload failed: ${e.message}", Toast.LENGTH_SHORT).show() } }
         }
     }
 
-    val profileSurface = if (profileSurfaceOrdinal == 0) ProfileSurface.PERSONAL else ProfileSurface.ADS_CAMPAIGNS
+    val trustScore = remember(userProfile.trustScore) {
+        (userProfile.trustScore * 2.0).coerceIn(0.0, 10.0).toFloat()
+    }
+    val scoreText = if (userProfile.trustScore > 0)
+        String.format(Locale.US, "%.1f", userProfile.trustScore * 2.0)
+    else "—"
 
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White)
-            .padding(horizontal = 16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        contentPadding = PaddingValues(top = 16.dp, bottom = 32.dp)
+            .background(AppBackground),
+        contentPadding = PaddingValues(bottom = 100.dp)
     ) {
+        // ── 1. profile-header ────────────────────────────────────────────────
         item {
-            ConvexCardBox(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 24.dp),
-                shape = RoundedCornerShape(32.dp),
-                elevation = 24.dp
+                    .background(AppBackground)
+                    .padding(horizontal = 20.dp)
+                    .padding(top = 16.dp)
             ) {
-                Column(
+                // Avatar row + Edit / Back button
+                Row(
                     modifier = Modifier
-                        .padding(32.dp)
-                        .fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Bottom
                 ) {
+                    // profile-avatar-wrap: gradient ring
                     Box(
                         modifier = Modifier
-                            .size(100.dp)
-                            .clip(CircleShape)
-                            .background(SurfaceMuted)
+                            .size(84.dp)
+                            .background(
+                                Brush.linearGradient(
+                                    listOf(AppViolet, AppTeal),
+                                    start = Offset(0f, 0f),
+                                    end = Offset(240f, 240f)
+                                ),
+                                CircleShape
+                            )
+                            .padding(2.5.dp)
                             .clickable(enabled = !isAvatarUploading && !isViewingOtherUser) {
-                                pickAvatar.launch(
-                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                                )
+                                pickAvatar.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                             },
                         contentAlignment = Alignment.Center
                     ) {
-                        AsyncImage(
-                            model = userProfile.avatar.ifEmpty { "https://api.dicebear.com/7.x/avataaars/svg?seed=${userProfile.uid}" },
-                            contentDescription = "Avatar",
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
-                        )
-                        if (isAvatarUploading) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(Color.Black.copy(alpha = 0.35f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(36.dp),
-                                    color = RichPastelCoral,
-                                    strokeWidth = 2.dp
-                                )
-                            }
-                        }
-                    }
-                    if (!isViewingOtherUser) {
-                        Text(
-                            "Tap photo to change",
-                            style = AppTextStyles.BodySmall,
-                            color = DarkPastelAnthracite.copy(alpha = 0.45f),
-                            fontSize = 11.sp,
-                            modifier = Modifier.padding(top = 6.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    Text(userProfile.name, style = AppTextStyles.Heading2.copy(fontSize = 24.sp))
-                    Text(userProfile.handle, color = DarkPastelAnthracite.copy(alpha = 0.55f), style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Medium)
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .background(MutedPastelGold.copy(alpha = 0.12f), RoundedCornerShape(12.dp))
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Icon(Icons.Filled.Star, contentDescription = null, tint = MutedPastelGold, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-
-                        val scoreText =
-                            if (userProfile.trustScore > 0) String.format(Locale.US, "%.1f", userProfile.trustScore) else "—"
-                        Text(scoreText, fontWeight = FontWeight.Bold, color = MutedPastelGold, fontSize = 14.sp)
-                        Text(
-                            " (trust score)",
-                            color = MutedPastelGold.copy(alpha = 0.85f),
-                            fontSize = 12.sp,
-                            modifier = Modifier.padding(start = 4.dp)
-                        )
-                    }
-
-                    when (profileSurface) {
-                        ProfileSurface.PERSONAL -> {
-                            Spacer(modifier = Modifier.height(20.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceEvenly
-                            ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text("${myPosts.size}", style = AppTextStyles.Heading2.copy(fontSize = 24.sp))
-                                    Text(
-                                        "RECS",
-                                        style = AppTextStyles.BodySmall,
-                                        color = DarkPastelAnthracite.copy(alpha = 0.45f),
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text("$followersCount", style = AppTextStyles.Heading2.copy(fontSize = 24.sp))
-                                    Text(
-                                        "FOLLOWERS",
-                                        style = AppTextStyles.BodySmall,
-                                        color = DarkPastelAnthracite.copy(alpha = 0.45f),
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text("${userProfile.following.size}", style = AppTextStyles.Heading2.copy(fontSize = 24.sp))
-                                    Text(
-                                        "SUBSCRIPTIONS",
-                                        style = AppTextStyles.BodySmall,
-                                        color = DarkPastelAnthracite.copy(alpha = 0.45f),
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                userProfile.bio.ifEmpty { "Hi! I'm on TrustList." },
-                                style = AppTextStyles.BodyMedium,
-                                color = DarkPastelAnthracite.copy(alpha = 0.65f),
-                                textAlign = TextAlign.Center
-                            )
-
-                            if (!isViewingOtherUser) {
-                                Spacer(modifier = Modifier.height(20.dp))
-                                if (userProfile.isBusiness) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(50.dp)
-                                            .background(
-                                                brush = PrimaryGradient,
-                                                shape = RoundedCornerShape(16.dp)
-                                            )
-                                            .padding(1.5.dp)
-                                            .background(Color.White, shape = RoundedCornerShape(16.dp))
-                                            .clickable { onProfileSurfaceChange(1) },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.Center
-                                        ) {
-                                            Text("Ad Campaigns", style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold, color = AppDark)
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = AppDark, modifier = Modifier.size(20.dp))
-                                        }
-                                    }
-                                } else {
-                                    OutlinedButton(
-                                        onClick = {
-                                            db.trustListDataRoot()
-                                                .collection("users").document(userProfile.uid)
-                                                .update("isBusiness", true)
-                                                .addOnSuccessListener {
-                                                    Toast.makeText(context, "Ad Studio activated!", Toast.LENGTH_SHORT).show()
-                                                }
-                                                .addOnFailureListener { e ->
-                                                    Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
-                                                }
-                                        },
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(50.dp),
-                                        shape = RoundedCornerShape(16.dp),
-                                        border = BorderStroke(1.5.dp, MutedPastelTeal),
-                                        colors = ButtonDefaults.outlinedButtonColors(
-                                            contentColor = MutedPastelTeal
-                                        )
-                                    ) {
-                                        Icon(Icons.Filled.Campaign, contentDescription = null, tint = MutedPastelTeal, modifier = Modifier.size(18.dp))
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text("Open Ad Studio", style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold, color = MutedPastelTeal)
-                                    }
-                                }
-                            }
-                        }
-
-                        ProfileSurface.ADS_CAMPAIGNS -> {
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Box(modifier = Modifier.fillMaxWidth()) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .background(
-                                            brush = Brush.horizontalGradient(
-                                                colors = listOf(
-                                                    GradientTop,
-                                                    SurfaceMuted,
-                                                    GradientMid.copy(alpha = 0.85f)
-                                                )
-                                            ),
-                                            shape = RoundedCornerShape(20.dp)
-                                        )
-                                        .border(1.dp, Color.White.copy(alpha = 0.5f), RoundedCornerShape(20.dp))
-                                        .padding(16.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        Icons.Filled.AccountBalanceWallet,
-                                        contentDescription = null,
-                                        tint = MutedPastelGold,
-                                        modifier = Modifier.size(28.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                            "Balance: ${userProfile.trustCoins}",
-                                            style = AppTextStyles.BodyMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            color = DarkPastelAnthracite
-                                        )
-                                        Text(
-                                            "TrustCoins",
-                                            style = AppTextStyles.BodySmall,
-                                            color = DarkPastelAnthracite.copy(alpha = 0.55f)
-                                        )
-                                    }
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(20.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceEvenly
-                            ) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text("${myOffers.size}", style = AppTextStyles.Heading2.copy(fontSize = 24.sp))
-                                    Text(
-                                        "LAUNCHED",
-                                        style = AppTextStyles.BodySmall,
-                                        color = DarkPastelAnthracite.copy(alpha = 0.45f),
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text("$participatingPromoCampaignsCount", style = AppTextStyles.Heading2.copy(fontSize = 24.sp))
-                                    Text(
-                                        "AS PROMOTER",
-                                        style = AppTextStyles.BodySmall,
-                                        color = DarkPastelAnthracite.copy(alpha = 0.45f),
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(20.dp))
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(50.dp)
-                                    .background(
-                                        brush = PrimaryGradient,
-                                        shape = RoundedCornerShape(16.dp)
-                                    )
-                                    .padding(1.5.dp)
-                                    .background(Color.White, shape = RoundedCornerShape(16.dp))
-                                    .clickable { onProfileSurfaceChange(0) },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.Center
-                                ) {
-                                    Icon(Icons.Filled.Person, contentDescription = null, tint = AppDark, modifier = Modifier.size(20.dp))
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text("Personal cabinet", style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold, color = AppDark)
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(20.dp))
-                    HorizontalDivider(color = SurfaceMuted)
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    if (isViewingOtherUser) {
+                        // profile-avatar-inner: white circle with image
                         Box(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .height(50.dp)
-                                .background(
-                                    brush = PrimaryGradient,
-                                    shape = RoundedCornerShape(16.dp)
-                                )
-                                .padding(1.5.dp)
-                                .background(Color.White, shape = RoundedCornerShape(16.dp))
-                                .clickable { onBack?.invoke() },
+                                .fillMaxSize()
+                                .background(AppWhite, CircleShape)
+                                .clip(CircleShape),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("Back", style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = AppDark)
-                        }
-                    } else {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(50.dp)
-                                .background(
-                                    brush = PrimaryGradient,
-                                    shape = RoundedCornerShape(16.dp)
-                                )
-                                .padding(1.5.dp)
-                                .background(Color.White, shape = RoundedCornerShape(16.dp))
-                                .clickable {
-                                    FirebaseAuth.getInstance().signOut()
-                                    onLogout()
+                            AsyncImage(
+                                model = userProfile.avatar.ifEmpty {
+                                    "https://api.dicebear.com/7.x/avataaars/svg?seed=${userProfile.uid}"
                                 },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.Center
-                            ) {
-                                Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null, tint = AppDark)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Log out", style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = AppDark)
+                                contentDescription = "Avatar",
+                                modifier = Modifier.fillMaxSize().clip(CircleShape),
+                                contentScale = ContentScale.Crop
+                            )
+                            if (isAvatarUploading) {
+                                Box(
+                                    modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    CircularProgressIndicator(modifier = Modifier.size(28.dp), color = AppTeal, strokeWidth = 2.dp)
+                                }
                             }
                         }
+                    }
+
+                    // Edit profile / Back / Logout button
+                    if (isViewingOtherUser) {
+                        ProfileOutlinedButton(text = "← Back") { onBack?.invoke() }
+                    } else {
+                        ProfileOutlinedButton(text = "Edit profile") { /* TODO: edit */ }
+                    }
+                }
+
+                // profile-name — max 2/3 ширины, авто-уменьшение при длинном имени
+                var nameFontSize by remember(userProfile.name) { mutableStateOf(18.sp) }
+                Text(
+                    text = userProfile.name.ifBlank { "User" },
+                    fontFamily = HeadingFontFamily,
+                    fontWeight = FontWeight.Black,
+                    fontSize = nameFontSize,
+                    color = AppDark,
+                    maxLines = 1,
+                    overflow = TextOverflow.Clip,
+                    modifier = Modifier.fillMaxWidth(2f / 3f),
+                    onTextLayout = { result ->
+                        if (result.hasVisualOverflow && nameFontSize > 13.sp) {
+                            nameFontSize = (nameFontSize.value * 0.85f).sp
+                        }
+                    }
+                )
+
+                // profile-handle + location
+                val handleText = buildString {
+                    if (userProfile.handle.isNotBlank()) append(userProfile.handle)
+                    // add city if available (from bio or name — stub)
+                }
+                if (handleText.isNotBlank()) {
+                    Text(
+                        text = handleText,
+                        fontFamily = BodyFontFamily,
+                        fontSize = 14.sp,
+                        color = AppMuted,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
+
+                // profile-bio
+                val bio = userProfile.bio.ifBlank { "City explorer. Trust the pack 🐺" }
+                Text(
+                    text = bio,
+                    fontFamily = BodyFontFamily,
+                    fontSize = 14.sp,
+                    color = AppDark.copy(alpha = 0.75f),
+                    lineHeight = 21.sp,
+                    modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)
+                )
+
+                // stats-row: Picks | Followers | Following
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    ProfileStat(value = "${myPosts.size}", label = "Picks")
+                    Box(modifier = Modifier.width(1.dp).height(32.dp).background(SurfaceMuted))
+                    ProfileStat(value = "$followersCount", label = "Followers")
+                    Box(modifier = Modifier.width(1.dp).height(32.dp).background(SurfaceMuted))
+                    ProfileStat(value = "${userProfile.following.size}", label = "Following")
+                }
+
+                // trust-score-row: white card — ring + label + coins chip (unified block, matches HTML)
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = AppWhite,
+                    shadowElevation = 2.dp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        // Ring (score visible inside)
+                        TrustScoreRing(
+                            score = trustScore,
+                            size = 56.dp,
+                            strokeWidth = 4.dp
+                        )
+                        // Labels
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "TrustScore",
+                                fontFamily = HeadingFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp,
+                                color = AppDark
+                            )
+                            Text(
+                                text = "Based on ${myPosts.size} picks",
+                                fontFamily = BodyFontFamily,
+                                fontSize = 12.sp,
+                                color = AppMuted,
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
+                        }
+                        // coins-chip (right-aligned, gold, matches HTML .coins-chip)
+                        if (!isViewingOtherUser) {
+                            Box(
+                                modifier = Modifier
+                                    .background(AppGold.copy(alpha = 0.12f), RoundedCornerShape(20.dp))
+                                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Text(
+                                    text = "🪙 ${userProfile.trustCoins}",
+                                    fontFamily = BodyFontFamily,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp,
+                                    color = AppGold
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Logout button (own profile only)
+                if (!isViewingOtherUser) {
+                    ProfileOutlinedButton(
+                        text = "Log out",
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                        leadingIcon = { Icon(Icons.AutoMirrored.Filled.ExitToApp, null, tint = AppMuted, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)) }
+                    ) {
+                        FirebaseAuth.getInstance().signOut()
+                        onLogout()
                     }
                 }
             }
         }
 
-        when (profileSurface) {
-            ProfileSurface.PERSONAL -> {
-                personalRecsAndCollectionsSection(
-                    selectedTab = selectedTab,
-                    onSelectedTab = { selectedTab = it },
-                    myPosts = myPosts,
-                    collections = collections,
-                    onPostClick = onPostClick,
-                    onCollectionClick = onCollectionClick,
-                    recsTabLabel = "My recs",
-                    collectionsTabLabel = "Collections"
-                )
-            }
+        // ── 2. Tabs + content ────────────────────────────────────────────────
+        personalRecsAndCollectionsSection(
+            selectedTab = selectedTab,
+            onSelectedTab = { selectedTab = it },
+            myPosts = myPosts,
+            collections = collections,
+            myOffers = myOffers,
+            isBusiness = userProfile.isBusiness,
+            onPostClick = onPostClick,
+            onCollectionClick = onCollectionClick,
+            onCreateCampaign = onCreateCampaign,
+            onOfferClick = onOfferClick,
+            onOfferPauseToggle = onOfferPauseToggle,
+            isViewerOwner = !isViewingOtherUser
+        )
+    }
+}
 
-            ProfileSurface.ADS_CAMPAIGNS -> {
-                adsDashboardSection(
-                    myOffers = myOffers,
-                    isBusiness = userProfile.isBusiness,
-                    onCreateCampaign = onCreateCampaign,
-                    onOfferClick = onOfferClick,
-                    onOfferPauseToggle = onOfferPauseToggle,
-                    onActivateAdStudio = {
-                        db.trustListDataRoot()
-                            .collection("users").document(userProfile.uid)
-                            .update("isBusiness", true)
-                            .addOnSuccessListener {
-                                Toast.makeText(context, "Ad Studio activated!", Toast.LENGTH_SHORT).show()
-                            }
-                            .addOnFailureListener { e ->
-                                Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
-                            }
-                    },
-                    isViewerOwner = true
-                )
-            }
+// ─── Stat cell ────────────────────────────────────────────────────────────────
+
+@Composable
+private fun ProfileStat(value: String, label: String) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = value,
+            fontFamily = HeadingFontFamily,
+            fontWeight = FontWeight.Black,
+            fontSize = 20.sp,
+            color = AppDark
+        )
+        Text(
+            text = label,
+            fontFamily = BodyFontFamily,
+            fontWeight = FontWeight.Medium,
+            fontSize = 12.sp,
+            color = AppMuted,
+            modifier = Modifier.padding(top = 2.dp)
+        )
+    }
+}
+
+// ─── Outlined button (Edit profile / Back / Log out) ─────────────────────────
+
+@Composable
+private fun ProfileOutlinedButton(
+    text: String,
+    modifier: Modifier = Modifier,
+    leadingIcon: (@Composable () -> Unit)? = null,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = modifier
+            .border(1.5.dp, Color(0xFFE0DDD8), RoundedCornerShape(12.dp))
+            .background(AppWhite, RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(12.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            leadingIcon?.invoke()
+            Text(
+                text = text,
+                fontFamily = BodyFontFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp,
+                color = AppDark
+            )
         }
     }
 }
+
+// ─── Tabs + grid section ──────────────────────────────────────────────────────
+
+internal fun LazyListScope.personalRecsAndCollectionsSection(
+    selectedTab: Int,
+    onSelectedTab: (Int) -> Unit,
+    myPosts: List<Post>,
+    collections: List<PostCollection>,
+    myOffers: List<AdOffer> = emptyList(),
+    isBusiness: Boolean = false,
+    onPostClick: (String) -> Unit,
+    onCollectionClick: (PostCollection) -> Unit,
+    onCreateCampaign: () -> Unit = {},
+    onOfferClick: (AdOffer) -> Unit = {},
+    onOfferPauseToggle: (AdOffer) -> Unit = {},
+    recsTabLabel: String = "Picks",
+    collectionsTabLabel: String = "Collections",
+    isViewerOwner: Boolean = true
+) {
+    // Tab bar — matches HTML .tabs { padding: 0 20px; border-bottom: 1px solid surf }
+    // Active tab has its own 2dp violet underline (HTML: border-bottom-color: violet)
+    item {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(AppBackground)
+                    .padding(horizontal = 20.dp)  // HTML: padding: 0 20px
+            ) {
+                listOf(recsTabLabel, collectionsTabLabel, "Offers").forEachIndexed { index, label ->
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { onSelectedTab(index) },
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = label,
+                            fontFamily = BodyFontFamily,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp,
+                            color = if (selectedTab == index) AppViolet else AppMuted,
+                            modifier = Modifier.padding(vertical = 12.dp)
+                        )
+                        // Active underline — 2dp violet, only under this tab item
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(2.dp)
+                                .background(if (selectedTab == index) AppViolet else Color.Transparent)
+                        )
+                    }
+                }
+            }
+            // Full-width 1dp border below all tabs (HTML: border-bottom: 1px solid surf)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(SurfaceMuted)
+            )
+        }
+        Spacer(Modifier.height(14.dp))
+    }
+
+    when (selectedTab) {
+        // ── Picks: 2-column grid ──────────────────────────────────────────────
+        0 -> {
+            if (myPosts.isEmpty()) {
+                item { EmptyStateCard("No picks yet") }
+            } else {
+                val rows = myPosts.chunked(2)
+                items(rows) { rowPosts ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp)
+                            .padding(bottom = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        rowPosts.forEach { post ->
+                            GridPostCard(
+                                post = post,
+                                modifier = Modifier.weight(1f),
+                                onClick = { onPostClick(post.id) }
+                            )
+                        }
+                        if (rowPosts.size == 1) Spacer(Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+
+        // ── Collections ───────────────────────────────────────────────────────
+        1 -> {
+            if (collections.isEmpty()) {
+                item { EmptyStateCard("No collections yet") }
+            } else {
+                val rows = collections.chunked(2)
+                items(rows) { rowItems ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp)
+                            .padding(bottom = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        rowItems.forEach { col ->
+                            CollectionCard(
+                                collection = col,
+                                modifier = Modifier.weight(1f),
+                                onClick = { onCollectionClick(col) }
+                            )
+                        }
+                        if (rowItems.size == 1) Spacer(Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+
+        // ── Offers ────────────────────────────────────────────────────────────
+        2 -> {
+            adsDashboardSection(
+                myOffers = myOffers,
+                isBusiness = isBusiness,
+                onCreateCampaign = onCreateCampaign,
+                onOfferClick = onOfferClick,
+                onOfferPauseToggle = onOfferPauseToggle,
+                isViewerOwner = isViewerOwner
+            )
+        }
+    }
+}
+
+// ─── grid-card: square card with gradient + emoji + dark overlay + title ──────
+
+@Composable
+private fun GridPostCard(
+    post: Post,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit = {}
+) {
+    val catStyle = remember(post.category) { categoryStyle(post.category) }
+
+    Box(
+        modifier = modifier
+            .aspectRatio(1f)
+            .clip(RoundedCornerShape(16.dp))
+            .clickable { onClick() }
+    ) {
+        // Background: image or gradient
+        if (!post.imageUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = post.imageUrl,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(catStyle.gradient),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(catStyle.emoji, fontSize = 36.sp)
+            }
+        }
+
+        // grid-overlay: only the bottom strip (matches HTML .grid-overlay: position absolute, bottom 0)
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color.Transparent,
+                            Color(0xFF1A2A24).copy(alpha = 0.70f)
+                        )
+                    )
+                )
+                .padding(horizontal = 10.dp, vertical = 8.dp)
+        ) {
+            Text(
+                text = post.title,
+                fontFamily = BodyFontFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 12.sp,
+                color = AppWhite,
+                lineHeight = 16.sp,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+// ─── Ads dashboard section (unchanged logic, lighter UI) ─────────────────────
 
 internal fun LazyListScope.adsDashboardSection(
     myOffers: List<AdOffer>,
@@ -542,179 +608,65 @@ internal fun LazyListScope.adsDashboardSection(
     onOfferClick: (AdOffer) -> Unit,
     onOfferPauseToggle: (AdOffer) -> Unit,
     onActivateAdStudio: () -> Unit = {},
-    /** When false, viewing someone else: no new campaign, no pause, read-only list. */
     isViewerOwner: Boolean = true
 ) {
     item {
-        Text(
-            if (isViewerOwner) "Ad dashboard" else "Launched campaigns",
-            style = AppTextStyles.Heading2.copy(fontSize = 20.sp),
-            color = DarkPastelAnthracite,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 8.dp)
-        )
-        Text(
-            if (isViewerOwner) "Your campaigns and rewards." else "Campaigns they launched.",
-            style = AppTextStyles.BodySmall,
-            color = DarkPastelAnthracite.copy(alpha = 0.5f),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 12.dp)
-        )
-        if (isViewerOwner && isBusiness) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .background(
-                        brush = PrimaryGradient,
-                        shape = RoundedCornerShape(16.dp)
-                    )
-                    .padding(1.5.dp)
-                    .background(Color.White, shape = RoundedCornerShape(16.dp))
-                    .clickable { onCreateCampaign() },
-                contentAlignment = Alignment.Center
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
+        Column(modifier = Modifier.padding(horizontal = 20.dp)) {
+            Text(
+                text = if (isViewerOwner) "Ad dashboard" else "Launched campaigns",
+                fontFamily = HeadingFontFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+                color = AppDark,
+                modifier = Modifier.padding(bottom = 4.dp)
+            )
+            Text(
+                text = if (isViewerOwner) "Your campaigns and rewards." else "Campaigns they launched.",
+                fontFamily = BodyFontFamily,
+                fontSize = 13.sp,
+                color = AppMuted,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+            if (isViewerOwner && isBusiness) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp)
+                        .background(
+                            Brush.horizontalGradient(listOf(AppViolet, AppTeal)),
+                            RoundedCornerShape(16.dp)
+                        )
+                        .clip(RoundedCornerShape(16.dp))
+                        .clickable { onCreateCampaign() },
+                    contentAlignment = Alignment.Center
                 ) {
-                    Icon(Icons.Filled.Campaign, contentDescription = null, tint = AppDark, modifier = Modifier.size(20.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("New campaign", style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold, color = AppDark)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Filled.Campaign, null, tint = AppWhite, modifier = Modifier.size(18.dp))
+                        Text("New campaign", fontFamily = BodyFontFamily, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = AppWhite)
+                    }
                 }
+                Spacer(Modifier.height(20.dp))
             }
-            Spacer(modifier = Modifier.height(24.dp))
-        } else if (isViewerOwner && !isBusiness) {
-            Spacer(modifier = Modifier.height(8.dp))
-            OutlinedButton(
-                onClick = onActivateAdStudio,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
-                shape = RoundedCornerShape(14.dp),
-                border = BorderStroke(1.5.dp, MutedPastelTeal),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = MutedPastelTeal
-                )
-            ) {
-                Icon(
-                    Icons.Filled.Campaign,
-                    contentDescription = null,
-                    tint = MutedPastelTeal,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    "Open Ad Studio",
-                    style = AppTextStyles.BodyMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MutedPastelTeal
-                )
-            }
-            Spacer(modifier = Modifier.height(16.dp))
         }
     }
+
     val showPause = isViewerOwner && isBusiness
     when {
-        myOffers.isEmpty() -> item {
-            EmptyStateCard(
-                if (isViewerOwner) "No campaigns yet. Tap New campaign or + to launch your first offer."
-                else "No public campaigns yet."
-            )
-        }
+        myOffers.isEmpty() -> item { Box(Modifier.padding(horizontal = 20.dp)) { EmptyStateCard(if (isViewerOwner) "No campaigns yet." else "No public campaigns yet.") } }
         else -> items(myOffers, key = { it.id }) { offer ->
-            AdOfferProfileCard(
-                offer = offer,
-                onCardClick = { onOfferClick(offer) },
-                showPauseButton = showPause,
-                onPauseClick = { onOfferPauseToggle(offer) }
-            )
-        }
-    }
-}
-
-internal fun LazyListScope.personalRecsAndCollectionsSection(
-    selectedTab: Int,
-    onSelectedTab: (Int) -> Unit,
-    myPosts: List<Post>,
-    collections: List<PostCollection>,
-    onPostClick: (String) -> Unit,
-    onCollectionClick: (PostCollection) -> Unit,
-    recsTabLabel: String = "My recs",
-    collectionsTabLabel: String = "Collections"
-) {
-    item {
-        TabRow(
-            selectedTabIndex = selectedTab,
-            containerColor = Color.Transparent,
-            contentColor = AppDark,
-            indicator = { tabPositions ->
-                Box(
-                    Modifier
-                        .tabIndicatorOffset(tabPositions[selectedTab])
-                        .height(3.dp)
-                        .background(
-                            brush = PrimaryGradient,
-                            shape = RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp)
-                        )
+            Box(Modifier.padding(horizontal = 20.dp)) {
+                AdOfferProfileCard(
+                    offer = offer,
+                    onCardClick = { onOfferClick(offer) },
+                    showPauseButton = showPause,
+                    onPauseClick = { onOfferPauseToggle(offer) }
                 )
-            },
-            divider = {}
-        ) {
-            Tab(
-                selected = selectedTab == 0,
-                onClick = { onSelectedTab(0) },
-                text = { Text(recsTabLabel, style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold) }
-            )
-            Tab(
-                selected = selectedTab == 1,
-                onClick = { onSelectedTab(1) },
-                text = { Text(collectionsTabLabel, style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold) }
-            )
-        }
-        Spacer(modifier = Modifier.height(16.dp))
-    }
-
-    if (selectedTab == 0) {
-        if (myPosts.isEmpty()) {
-            item {
-                EmptyStateCard("No recommendations yet")
-            }
-        } else {
-            items(myPosts) { post ->
-                PostSmallCard(post = post, onClick = { onPostClick(post.id) })
-            }
-        }
-    } else {
-        if (collections.isEmpty()) {
-            item {
-                EmptyStateCard("No collections yet")
-            }
-        } else {
-            val chunkedCollections = collections.chunked(2)
-            items(chunkedCollections) { rowItems ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    rowItems.forEach { collection ->
-                        CollectionCard(
-                            collection = collection,
-                            modifier = Modifier.weight(1f),
-                            onClick = { onCollectionClick(collection) }
-                        )
-                    }
-                    if (rowItems.size == 1) {
-                        Spacer(modifier = Modifier.weight(1f))
-                    }
-                }
-                Spacer(modifier = Modifier.height(16.dp))
             }
         }
     }
 }
+
+// ─── Helper cards ─────────────────────────────────────────────────────────────
 
 @Composable
 fun AdOfferProfileCard(
@@ -724,19 +676,16 @@ fun AdOfferProfileCard(
     onPauseClick: () -> Unit = {}
 ) {
     val isActive = offer.status.equals("active", ignoreCase = true)
-    val cardModifier = Modifier
-        .fillMaxWidth()
-        .padding(bottom = 12.dp)
-        .then(
-            if (onCardClick != null) Modifier.clickable { onCardClick() } else Modifier
-        )
-
-    ConvexCardBox(
-        modifier = cardModifier,
-        shape = RoundedCornerShape(24.dp),
-        elevation = 22.dp
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = AppWhite,
+        shadowElevation = 2.dp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 12.dp)
+            .then(if (onCardClick != null) Modifier.clickable { onCardClick() } else Modifier)
     ) {
-        Column(modifier = Modifier.padding(20.dp)) {
+        Column(modifier = Modifier.padding(16.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -745,95 +694,73 @@ fun AdOfferProfileCard(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         offer.title,
-                        style = AppTextStyles.BodyMedium,
+                        fontFamily = HeadingFontFamily,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 17.sp,
-                        color = DarkPastelAnthracite,
+                        fontSize = 15.sp,
+                        color = AppDark,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = when (offer.status.lowercase(Locale.US)) {
-                            "active" -> SurfacePastel
-                            "paused" -> SurfaceMuted
-                            else -> SurfaceMuted
-                        }
+                    Spacer(Modifier.height(6.dp))
+                    Box(
+                        modifier = Modifier
+                            .background(
+                                if (isActive) AppTeal.copy(alpha = 0.10f) else SurfaceMuted,
+                                RoundedCornerShape(8.dp)
+                            )
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
                     ) {
                         Text(
                             offer.status.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() },
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                            style = AppTextStyles.BodySmall,
+                            fontFamily = BodyFontFamily,
                             fontWeight = FontWeight.SemiBold,
-                            color = AppDark
+                            fontSize = 12.sp,
+                            color = if (isActive) AppTeal else AppMuted
                         )
                     }
                 }
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(horizontalAlignment = Alignment.End) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("🪙", fontSize = 14.sp)
+                        Text(
+                            "${offer.rewardCoins}",
+                            fontFamily = HeadingFontFamily,
+                            fontWeight = FontWeight.Black,
+                            fontSize = 20.sp,
+                            color = AppGold
+                        )
+                    }
+                    Text("TrustCoins", fontFamily = BodyFontFamily, fontSize = 11.sp, color = AppMuted)
                     if (showPauseButton) {
-                        IconButton(onClick = onPauseClick) {
+                        Spacer(Modifier.height(8.dp))
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(SurfaceMuted)
+                                .clickable { onPauseClick() }
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
                             Icon(
                                 if (isActive) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                                contentDescription = if (isActive) "Pause" else "Resume",
-                                tint = MutedPastelTeal
-                            )
-                        }
-                    }
-                    Column(horizontalAlignment = Alignment.End) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                Icons.Filled.AccountBalanceWallet,
                                 contentDescription = null,
-                                tint = MutedPastelGold,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                "${offer.rewardCoins}",
-                                style = AppTextStyles.Heading2.copy(fontSize = 20.sp),
-                                fontWeight = FontWeight.Bold,
-                                color = AppDark
+                                tint = AppMuted,
+                                modifier = Modifier.size(16.dp)
                             )
                         }
-                        Text(
-                            "TrustCoins",
-                            style = AppTextStyles.BodySmall,
-                            color = DarkPastelAnthracite.copy(alpha = 0.45f)
-                        )
                     }
                 }
             }
             if (offer.description.isNotBlank()) {
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(Modifier.height(8.dp))
                 Text(
                     offer.description,
-                    style = AppTextStyles.BodySmall,
-                    color = DarkPastelAnthracite.copy(alpha = 0.65f),
+                    fontFamily = BodyFontFamily,
+                    fontSize = 13.sp,
+                    color = AppMuted,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     lineHeight = 18.sp
                 )
-            }
-            Spacer(modifier = Modifier.height(10.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    "Min. trust ${String.format(Locale.US, "%.1f", offer.minTrustScore)}",
-                    style = AppTextStyles.BodySmall,
-                    color = DarkPastelAnthracite.copy(alpha = 0.55f)
-                )
-                val dateStr = formatAdOfferDate(offer.createdAt)
-                if (dateStr.isNotEmpty()) {
-                    Text(
-                        dateStr,
-                        style = AppTextStyles.BodySmall,
-                        color = DarkPastelAnthracite.copy(alpha = 0.4f)
-                    )
-                }
             }
         }
     }
@@ -841,52 +768,75 @@ fun AdOfferProfileCard(
 
 @Composable
 fun EmptyStateCard(text: String) {
-    ConvexCardBox(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        elevation = 20.dp
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 8.dp)
+            .background(AppWhite, RoundedCornerShape(20.dp))
+            .border(1.dp, SurfaceMuted, RoundedCornerShape(20.dp))
+            .padding(32.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
-            Text(text, style = AppTextStyles.BodyMedium, color = DarkPastelAnthracite.copy(alpha = 0.55f), fontWeight = FontWeight.Medium)
-        }
+        Text(
+            text = text,
+            fontFamily = BodyFontFamily,
+            fontWeight = FontWeight.Medium,
+            fontSize = 14.sp,
+            color = AppMuted,
+            textAlign = TextAlign.Center
+        )
     }
 }
 
 @Composable
 fun PostSmallCard(post: Post, onClick: () -> Unit = {}) {
-    ConvexCardBox(
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = AppWhite,
+        shadowElevation = 2.dp,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(bottom = 12.dp)
-            .clickable { onClick() },
-        shape = RoundedCornerShape(24.dp),
-        elevation = 20.dp
+            .padding(horizontal = 20.dp, vertical = 5.dp)
+            .clickable { onClick() }
     ) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (post.imageUrl != null) {
+        Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+            val catStyle = remember(post.category) { categoryStyle(post.category) }
+            if (!post.imageUrl.isNullOrBlank()) {
                 AsyncImage(
                     model = post.imageUrl,
                     contentDescription = null,
-                    modifier = Modifier.size(60.dp).clip(RoundedCornerShape(12.dp)).background(SurfaceMuted),
+                    modifier = Modifier.size(52.dp).clip(RoundedCornerShape(12.dp)).background(SurfaceMuted),
                     contentScale = ContentScale.Crop
                 )
-                Spacer(modifier = Modifier.width(16.dp))
             } else {
-                Box(modifier = Modifier.size(60.dp).clip(RoundedCornerShape(12.dp)).background(SurfaceMuted), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Filled.Star, contentDescription = null, tint = MutedPastelTeal.copy(alpha = 0.4f))
+                Box(
+                    modifier = Modifier
+                        .size(52.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(catStyle.gradient),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(catStyle.emoji, fontSize = 24.sp)
                 }
-                Spacer(modifier = Modifier.width(16.dp))
             }
-
-            Column {
-                Text(post.title, style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Filled.Star, contentDescription = null, tint = MutedPastelGold, modifier = Modifier.size(14.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("${post.rating}/5", color = DarkPastelAnthracite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    Text(" • ${post.category}", style = AppTextStyles.BodySmall, color = DarkPastelAnthracite.copy(alpha = 0.55f))
-                }
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    post.title,
+                    fontFamily = HeadingFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    color = AppDark,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    "📍 ${post.location.ifBlank { post.category }}",
+                    fontFamily = BodyFontFamily,
+                    fontSize = 12.sp,
+                    color = AppMuted,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
             }
         }
     }
@@ -898,37 +848,44 @@ fun CollectionCard(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    ConvexCardBox(
-        modifier = modifier.clickable { onClick() },
-        shape = RoundedCornerShape(24.dp),
-        elevation = 20.dp
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = AppWhite,
+        shadowElevation = 2.dp,
+        modifier = modifier
+            .clickable { onClick() }
+            .aspectRatio(1f)
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            horizontalAlignment = Alignment.Start
+            modifier = Modifier.padding(14.dp),
+            horizontalAlignment = Alignment.Start,
+            verticalArrangement = Arrangement.Center
         ) {
             Box(
                 modifier = Modifier
-                    .size(48.dp)
+                    .size(44.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(SurfaceMuted),
+                    .background(AppViolet.copy(alpha = 0.10f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Filled.Bookmarks, contentDescription = null, tint = MutedPastelTeal)
+                Icon(Icons.Filled.Bookmarks, contentDescription = null, tint = AppViolet, modifier = Modifier.size(22.dp))
             }
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(Modifier.height(10.dp))
             Text(
                 collection.name,
-                style = AppTextStyles.BodyMedium,
+                fontFamily = HeadingFontFamily,
                 fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-                maxLines = 1,
+                fontSize = 14.sp,
+                color = AppDark,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
             Text(
-                "${collection.postIds.size} posts",
-                style = AppTextStyles.BodySmall,
-                color = DarkPastelAnthracite.copy(alpha = 0.55f)
+                "${collection.postIds.size} picks",
+                fontFamily = BodyFontFamily,
+                fontSize = 12.sp,
+                color = AppMuted,
+                modifier = Modifier.padding(top = 3.dp)
             )
         }
     }

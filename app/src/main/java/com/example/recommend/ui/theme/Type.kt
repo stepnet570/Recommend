@@ -8,25 +8,32 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.example.recommend.R
 
+// ─── Syne static files — wght 400 / 600 / 700 / 800 ─────────────────────────
 val HeadingFontFamily = FontFamily(
-    Font(R.font.syne_variable, FontWeight.Normal),
-    Font(R.font.syne_variable, FontWeight.Medium),
-    Font(R.font.syne_variable, FontWeight.SemiBold),
-    Font(R.font.syne_variable, FontWeight.Bold),
-    Font(R.font.syne_variable, FontWeight.Black)
+    Font(R.font.syne_regular,   FontWeight.Normal),
+    Font(R.font.syne_semibold,  FontWeight.SemiBold),
+    Font(R.font.syne_bold,      FontWeight.Bold),
+    Font(R.font.syne_extrabold, FontWeight.ExtraBold),
+    Font(R.font.syne_extrabold, FontWeight.Black),   // Syne max is 800
 )
 
+// ─── DM Sans static files — wght 400 / 500 / 600 / 700 ──────────────────────
 val BodyFontFamily = FontFamily(
-    Font(R.font.dm_sans_variable, FontWeight.Normal),
-    Font(R.font.dm_sans_variable, FontWeight.Medium),
-    Font(R.font.dm_sans_variable, FontWeight.SemiBold),
-    Font(R.font.dm_sans_variable, FontWeight.Bold)
+    Font(R.font.dm_sans_regular,  FontWeight.Light),
+    Font(R.font.dm_sans_regular,  FontWeight.Normal),
+    Font(R.font.dm_sans_medium,   FontWeight.Medium),
+    Font(R.font.dm_sans_semibold, FontWeight.SemiBold),
+    Font(R.font.dm_sans_bold,     FontWeight.Bold),
+    Font(R.font.dm_sans_bold,     FontWeight.ExtraBold),
+    Font(R.font.dm_sans_bold,     FontWeight.Black),
 )
+
+// ─── Text styles ──────────────────────────────────────────────────────────────
 
 object AppTextStyles {
     val Heading1 = TextStyle(
         fontFamily = HeadingFontFamily,
-        fontWeight = FontWeight.Bold,
+        fontWeight = FontWeight.ExtraBold,
         fontSize = 32.sp,
         lineHeight = 38.sp,
         letterSpacing = (-0.6).sp,
@@ -62,17 +69,17 @@ object AppTextStyles {
 }
 
 val AppTypography = Typography(
-    displayLarge = AppTextStyles.Heading1,
-    headlineLarge = AppTextStyles.Heading1,
+    displayLarge   = AppTextStyles.Heading1,
+    headlineLarge  = AppTextStyles.Heading1,
     headlineMedium = AppTextStyles.Heading2,
-    headlineSmall = AppTextStyles.Heading2.copy(fontSize = 20.sp, lineHeight = 26.sp),
-    titleLarge = AppTextStyles.Heading2,
-    titleMedium = AppTextStyles.BodyMedium.copy(fontWeight = FontWeight.SemiBold),
-    titleSmall = AppTextStyles.BodySmall.copy(fontWeight = FontWeight.SemiBold),
-    bodyLarge = AppTextStyles.BodyMedium.copy(fontSize = 16.sp, lineHeight = 24.sp),
-    bodyMedium = AppTextStyles.BodyMedium,
-    bodySmall = AppTextStyles.BodySmall,
-    labelLarge = AppTextStyles.BodyMedium.copy(fontWeight = FontWeight.SemiBold, fontSize = 14.sp),
-    labelMedium = AppTextStyles.BodySmall,
-    labelSmall = AppTextStyles.BodySmall.copy(fontSize = 11.sp, lineHeight = 14.sp)
+    headlineSmall  = AppTextStyles.Heading2.copy(fontSize = 20.sp, lineHeight = 26.sp),
+    titleLarge     = AppTextStyles.Heading2,
+    titleMedium    = AppTextStyles.BodyMedium.copy(fontWeight = FontWeight.SemiBold),
+    titleSmall     = AppTextStyles.BodySmall.copy(fontWeight = FontWeight.SemiBold),
+    bodyLarge      = AppTextStyles.BodyMedium.copy(fontSize = 16.sp, lineHeight = 24.sp),
+    bodyMedium     = AppTextStyles.BodyMedium,
+    bodySmall      = AppTextStyles.BodySmall,
+    labelLarge     = AppTextStyles.BodyMedium.copy(fontWeight = FontWeight.SemiBold, fontSize = 14.sp),
+    labelMedium    = AppTextStyles.BodySmall,
+    labelSmall     = AppTextStyles.BodySmall.copy(fontSize = 11.sp, lineHeight = 14.sp)
 )

@@ -36,7 +36,7 @@ fun AppTextField(
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     leadingIcon: @Composable (() -> Unit)? = null,
     suffix: @Composable (() -> Unit)? = null,
-    shape: Shape = RoundedCornerShape(16.dp),
+    shape: Shape = RoundedCornerShape(14.dp),
     containerColor: Color = Color.Transparent,
     enabled: Boolean = true
 ) {
@@ -44,8 +44,8 @@ fun AppTextField(
 
     Box(
         modifier = modifier.border(
-            width = if (isFocused) 1.5.dp else 1.dp,
-            brush = if (isFocused) PrimaryGradient else SolidColor(SurfaceMuted),
+            width = if (isFocused) 2.dp else 1.dp,
+            brush = if (isFocused) PrimaryGradientLinear else SolidColor(Color(0xFFE8E6E2)),
             shape = shape
         )
     ) {
@@ -72,7 +72,10 @@ fun AppTextField(
                 disabledBorderColor = Color.Transparent,
                 focusedContainerColor = containerColor,
                 unfocusedContainerColor = containerColor,
-                disabledContainerColor = containerColor
+                disabledContainerColor = containerColor,
+                cursorColor = AppViolet,
+                focusedTextColor = AppDark,
+                unfocusedTextColor = AppDark
             )
         )
     }

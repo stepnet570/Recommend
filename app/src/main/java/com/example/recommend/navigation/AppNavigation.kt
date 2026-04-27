@@ -67,29 +67,29 @@ fun AppNavigation(
     var createCampaignOverlay by remember { mutableStateOf(false) }
     var linkedRequestIdForAdd by remember { mutableStateOf<String?>(null) }
     var linkedOfferIdForAdd by remember { mutableStateOf<String?>(null) }
+    var linkedOfferTitleForAdd by remember { mutableStateOf<String?>(null) }
     var activeOffer by remember { mutableStateOf<AdOffer?>(null) }
     var addPickForRequestId by remember { mutableStateOf<String?>(null) }
     var selectedOfferId by remember { mutableStateOf<String?>(null) }
     var profileOfferCache by remember { mutableStateOf<AdOffer?>(null) }
     var profileSurfaceOrdinal by rememberSaveable { mutableIntStateOf(0) }
     var viewedUserProfile by remember { mutableStateOf<UserProfile?>(null) }
-    val acceptedOfferIds = remember(feedOffersForHome, currentUserProfile?.uid) {
-        val uid = currentUserProfile?.uid ?: return@remember emptySet<String>()
-        feedOffersForHome.filter { uid in it.acceptedBy }.map { it.id }.toSet()
-    }
-
-    // Reset business sub-destination when leaving add tab
+    var userInAddForm by remember { mutableStateOf(false) }
+    // Reset sub-destinations when leaving add tab
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
     LaunchedEffect(currentRoute) {
-        if (currentRoute != "add") businessAddDestination = BusinessAddDestination.Hub
+        if (currentRoute != "add") {
+            businessAddDestination = BusinessAddDestination.Hub
+            userInAddForm = false
+        }
     }
 
     // Сообщаем родителю: пользователь реально в процессе создания (не на экране выбора Hub)
-    LaunchedEffect(currentRoute, businessAddDestination) {
+    LaunchedEffect(currentRoute, businessAddDestination, userInAddForm) {
         val inFlow = when {
             currentRoute != "add" -> false
             currentUserProfile?.isBusiness == true -> businessAddDestination != BusinessAddDestination.Hub
-            else -> true  // обычный юзер на add — сразу в форме
+            else -> userInAddForm  // обычный юзер — только когда реально в форме (не Hub)
         }
         onCreationFlowActive(inFlow)
     }
@@ -120,6 +120,8 @@ fun AppNavigation(
             addPickForRequestId = null
             activeOffer = null
             createCampaignOverlay = false
+            linkedOfferIdForAdd = null
+            linkedOfferTitleForAdd = null
             onAskModalOpenChange(false)
         }
     }
@@ -186,8 +188,11 @@ fun AppNavigation(
                 if (currentUserProfile?.isBusiness == true) {
                     when (businessAddDestination) {
                         BusinessAddDestination.Hub -> AddHubScreen(
+                            isBusiness = true,
+                            campaignBalance = currentUserProfile?.trustCoins ?: 0,
                             onCampaign = { businessAddDestination = BusinessAddDestination.Campaign },
-                            onPost = { businessAddDestination = BusinessAddDestination.Post }
+                            onPost = { businessAddDestination = BusinessAddDestination.Post },
+                            onAskPack = { onAskModalOpenChange(true) }
                         )
                         BusinessAddDestination.Campaign -> CreateOfferScreen(
                             userProfile = currentUserProfile,
@@ -201,6 +206,7 @@ fun AppNavigation(
                             onPostAdded = {
                                 linkedRequestIdForAdd = null
                                 linkedOfferIdForAdd = null
+                                linkedOfferTitleForAdd = null
                                 businessAddDestination = BusinessAddDestination.Hub
                                 navController.navigate("feed")
                             },
@@ -208,21 +214,34 @@ fun AppNavigation(
                             onBack = { businessAddDestination = BusinessAddDestination.Hub },
                             requestId = linkedRequestIdForAdd,
                             offerId = linkedOfferIdForAdd,
+                            offerTitle = linkedOfferTitleForAdd,
                             isSponsored = linkedOfferIdForAdd != null
                         )
                     }
                 } else {
-                    AddScreen(
-                        onPostAdded = {
-                            linkedRequestIdForAdd = null
-                            linkedOfferIdForAdd = null
-                            navController.navigate("feed")
-                        },
-                        currentUserProfile = currentUserProfile,
-                        requestId = linkedRequestIdForAdd,
-                        offerId = linkedOfferIdForAdd,
-                        isSponsored = linkedOfferIdForAdd != null
-                    )
+                    if (userInAddForm) {
+                        AddScreen(
+                            onPostAdded = {
+                                linkedRequestIdForAdd = null
+                                linkedOfferIdForAdd = null
+                                linkedOfferTitleForAdd = null
+                                userInAddForm = false
+                                navController.navigate("feed")
+                            },
+                            currentUserProfile = currentUserProfile,
+                            onBack = { userInAddForm = false },
+                            requestId = linkedRequestIdForAdd,
+                            offerId = linkedOfferIdForAdd,
+                            offerTitle = linkedOfferTitleForAdd,
+                            isSponsored = linkedOfferIdForAdd != null
+                        )
+                    } else {
+                        AddHubScreen(
+                            isBusiness = false,
+                            onPost = { userInAddForm = true },
+                            onAskPack = { onAskModalOpenChange(true) }
+                        )
+                    }
                 }
             }
 
@@ -253,6 +272,10 @@ fun AppNavigation(
         if (isAskModalOpen) {
             AskPackScreen(
                 onDismiss = { onAskModalOpenChange(false) },
+                onCreated = {
+                    onAskModalOpenChange(false)
+                    navController.navigate("feed") { launchSingleTop = true }
+                },
                 users = allUsers,
                 currentUserProfile = currentUserProfile
             )
@@ -393,11 +416,18 @@ fun AppNavigation(
             AcceptOfferSheet(
                 offer = activeOffer!!,
                 viewerUid = currentUser.uid,
-                isAccepted = activeOffer!!.id in acceptedOfferIds,
+                isAccepted = currentUser.uid in activeOffer!!.acceptedBy,
                 onDismiss = { activeOffer = null },
-                onAccepted = { offerId, _, _ ->
-                    activeOffer = null
+                onAccepted = { offerId, offerTitle, _ ->
                     linkedOfferIdForAdd = offerId
+                    linkedOfferTitleForAdd = offerTitle
+                    activeOffer = null
+                    // Skip Hub in both cases — go straight to the post form
+                    if (currentUserProfile?.isBusiness == true) {
+                        businessAddDestination = BusinessAddDestination.Post
+                    } else {
+                        userInAddForm = true
+                    }
                     navController.navigate("add") { launchSingleTop = true }
                 }
             )

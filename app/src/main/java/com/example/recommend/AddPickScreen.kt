@@ -2,6 +2,7 @@ package com.example.recommend
 
 import com.example.recommend.data.model.*
 import com.example.recommend.ui.theme.*
+import com.example.recommend.ui.add.AddFieldLabel
 
 import android.net.Uri
 import android.os.Handler
@@ -19,7 +20,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -30,18 +30,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.recommend.ui.theme.AppTextStyles
-import com.example.recommend.ui.theme.BodyFontFamily
-import com.example.recommend.ui.theme.DarkPastelAnthracite
-import com.example.recommend.ui.theme.MutedPastelTeal
-import com.example.recommend.ui.theme.SoftPastelMint
-import com.example.recommend.ui.theme.SurfaceMuted
-import com.example.recommend.ui.theme.PrimaryGradient
-import com.example.recommend.ui.theme.AppDark
-import com.example.recommend.ui.theme.SurfaceMuted as SurfaceMutedAlias
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
@@ -49,10 +42,9 @@ import com.google.firebase.storage.StorageMetadata
 import java.util.concurrent.Executors
 
 /**
- * Standalone flow for adding a “pick” to a pack signal — not the main [AddScreen] recommendation form.
- * Collects title, photo, description, and an optional resource link; saves as a `posts` doc with [Post.replyToRequestId].
+ * Standalone flow for adding a "pick" to a pack signal.
+ * Redesigned to match the Artisan Pastel flat design system.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddPickScreen(
     requestId: String,
@@ -70,7 +62,6 @@ fun AddPickScreen(
     val db = FirebaseFirestore.getInstance()
     val auth = FirebaseAuth.getInstance()
     val storage = FirebaseStorage.getInstance()
-    val scheme = MaterialTheme.colorScheme
 
     val pickImage = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -129,8 +120,7 @@ fun AddPickScreen(
         if (uri != null) {
             compressExecutor.execute {
                 val bytes = ImageCompress.compressUriToJpeg(
-                    context,
-                    uri,
+                    context, uri,
                     ImageCompress.POST_MAX_SIDE_PX,
                     ImageCompress.POST_JPEG_QUALITY
                 )
@@ -169,207 +159,206 @@ fun AddPickScreen(
         }
     }
 
-    Scaffold(
-        containerColor = SoftPastelMint,
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        "Add a pick",
-                        style = AppTextStyles.BodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
-                        color = DarkPastelAnthracite
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onDismiss, enabled = !isUploading) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MutedPastelTeal)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = SoftPastelMint,
-                    titleContentColor = DarkPastelAnthracite,
-                    navigationIconContentColor = MutedPastelTeal
-                )
-            )
-        }
-    ) { paddingValues ->
-        LazyColumn(
+    val canPublish = !isUploading && title.isNotBlank()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(AppBackground)
+            .systemBarsPadding()
+            .imePadding()
+    ) {
+        // ── Top bar ──────────────────────────────────────────────────────
+        Row(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 16.dp),
-            contentPadding = PaddingValues(top = 8.dp, bottom = 32.dp),
+                .fillMaxWidth()
+                .height(56.dp)
+                .padding(horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onDismiss, enabled = !isUploading) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = AppDark)
+            }
+            Text(
+                "Add a Pick",
+                modifier = Modifier.weight(1f),
+                textAlign = TextAlign.Center,
+                fontFamily = HeadingFontFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 17.sp,
+                color = AppDark
+            )
+            TextButton(
+                onClick = { submit() },
+                enabled = canPublish
+            ) {
+                if (isUploading) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), color = AppViolet, strokeWidth = 2.dp)
+                } else {
+                    Text(
+                        "Publish",
+                        fontFamily = BodyFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        color = if (canPublish) AppViolet else AppMuted
+                    )
+                }
+            }
+        }
+
+        // ── Content ──────────────────────────────────────────────────────
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
+
+            // Reply to signal banner
             item {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
-                    color = MutedPastelTeal.copy(alpha = 0.12f)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(AppViolet.copy(alpha = 0.06f))
+                        .border(1.dp, AppViolet.copy(alpha = 0.2f), RoundedCornerShape(14.dp))
+                        .padding(12.dp, 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    Text("🐺", fontSize = 14.sp)
                     Text(
-                        text = "Reply to pack signal",
-                        style = AppTextStyles.BodySmall,
+                        "Reply to pack signal",
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = MutedPastelTeal,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                        color = AppViolet,
+                        fontFamily = BodyFontFamily
                     )
                 }
             }
 
+            // Photo
             item {
-                Card(
-                    shape = RoundedCornerShape(28.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-                ) {
-                    Column(modifier = Modifier.padding(20.dp)) {
-                        Text(
-                            "PHOTO",
-                            style = AppTextStyles.BodySmall,
-                            color = DarkPastelAnthracite.copy(alpha = 0.45f),
-                            letterSpacing = 1.sp
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(160.dp)
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(SurfaceMuted)
-                                .border(2.dp, SurfaceMuted, RoundedCornerShape(20.dp))
-                                .clickable(enabled = !isUploading) {
-                                    pickImage.launch(
-                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                                    )
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (selectedImageUri != null) {
-                                AsyncImage(
-                                    model = selectedImageUri,
-                                    contentDescription = null,
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Crop
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    AddFieldLabel("Photo")
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(160.dp)
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(AppWhite)
+                            .border(1.5.dp, Color(0xFFE8E6E2), RoundedCornerShape(20.dp))
+                            .clickable(enabled = !isUploading) {
+                                pickImage.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (selectedImageUri != null) {
+                            AsyncImage(
+                                model = selectedImageUri,
+                                contentDescription = null,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                            IconButton(
+                                onClick = { selectedImageUri = null },
+                                modifier = Modifier
+                                    .align(Alignment.TopEnd)
+                                    .padding(8.dp)
+                                    .background(Color.Black.copy(alpha = 0.45f), CircleShape)
+                            ) {
+                                Icon(Icons.Filled.Close, contentDescription = "Remove", tint = Color.White)
+                            }
+                        } else {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text("🖼️", fontSize = 32.sp)
+                                Text(
+                                    "Tap to add a photo (optional)",
+                                    fontSize = 13.sp,
+                                    color = AppMuted,
+                                    fontFamily = BodyFontFamily
                                 )
-                                IconButton(
-                                    onClick = { selectedImageUri = null },
-                                    modifier = Modifier
-                                        .align(Alignment.TopEnd)
-                                        .padding(8.dp)
-                                        .background(Color.Black.copy(alpha = 0.45f), CircleShape)
-                                ) {
-                                    Icon(Icons.Filled.Close, contentDescription = "Remove", tint = Color.White)
-                                }
-                            } else {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Icon(
-                                        Icons.Filled.AddPhotoAlternate,
-                                        contentDescription = null,
-                                        tint = MutedPastelTeal,
-                                        modifier = Modifier.size(40.dp)
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        "Tap to add a photo (optional)",
-                                        style = AppTextStyles.BodySmall,
-                                        color = DarkPastelAnthracite.copy(alpha = 0.55f)
-                                    )
-                                }
                             }
                         }
-
-                        Spacer(modifier = Modifier.height(20.dp))
-                        Text(
-                            "TITLE",
-                            style = AppTextStyles.BodySmall,
-                            color = DarkPastelAnthracite.copy(alpha = 0.45f)
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        OutlinedTextField(
-                            value = title,
-                            onValueChange = { title = it },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(14.dp),
-                            singleLine = true,
-                            placeholder = { Text("Name of the place or tip") },
-                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = scheme.primary),
-                            enabled = !isUploading
-                        )
-
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            "DESCRIPTION",
-                            style = AppTextStyles.BodySmall,
-                            color = DarkPastelAnthracite.copy(alpha = 0.45f)
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        OutlinedTextField(
-                            value = description,
-                            onValueChange = { description = it },
-                            modifier = Modifier.fillMaxWidth(),
-                            minLines = 3,
-                            shape = RoundedCornerShape(14.dp),
-                            placeholder = { Text("Why you recommend it…") },
-                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = scheme.primary),
-                            enabled = !isUploading
-                        )
-
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Text(
-                            "LINK",
-                            style = AppTextStyles.BodySmall,
-                            color = DarkPastelAnthracite.copy(alpha = 0.45f)
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        OutlinedTextField(
-                            value = resourceUrl,
-                            onValueChange = { resourceUrl = it },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(14.dp),
-                            singleLine = true,
-                            placeholder = { Text("https://…") },
-                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = scheme.primary),
-                            enabled = !isUploading
-                        )
                     }
                 }
             }
 
+            // Title
             item {
-                Button(
-                    onClick = { submit() },
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    AddFieldLabel("Title")
+                    AppTextField(
+                        value = title,
+                        onValueChange = { title = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = "Name of the place or tip",
+                        singleLine = true,
+                        enabled = !isUploading,
+                        containerColor = AppWhite
+                    )
+                }
+            }
+
+            // Description
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    AddFieldLabel("Why do you recommend it?")
+                    AppTextField(
+                        value = description,
+                        onValueChange = { description = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = "Share what makes it special…",
+                        singleLine = false,
+                        minLines = 4,
+                        enabled = !isUploading,
+                        containerColor = AppWhite
+                    )
+                }
+            }
+
+            // Link (optional)
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    AddFieldLabel("Link (optional)")
+                    AppTextField(
+                        value = resourceUrl,
+                        onValueChange = { resourceUrl = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = "https://…",
+                        singleLine = true,
+                        enabled = !isUploading,
+                        containerColor = AppWhite
+                    )
+                }
+            }
+
+            // Publish button
+            item {
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(52.dp)
-                        .background(brush = PrimaryGradient, shape = RoundedCornerShape(16.dp)),
-                    enabled = !isUploading && title.isNotBlank(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.Transparent,
-                        contentColor = AppDark,
-                        disabledContainerColor = SurfaceMutedAlias,
-                        disabledContentColor = MutedPastelTeal
-                    ),
-                    shape = RoundedCornerShape(16.dp)
+                        .height(56.dp)
+                        .clip(RoundedCornerShape(32.dp))
+                        .background(if (canPublish) PrimaryGradientLinear else DisabledGradient)
+                        .clickable(enabled = canPublish) { submit() },
+                    contentAlignment = Alignment.Center
                 ) {
                     if (isUploading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
-                            color = AppDark,
-                            strokeWidth = 2.dp
-                        )
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
                     } else {
                         Text(
-                            text = "Publish pick",
+                            "Publish Pick",
                             fontFamily = BodyFontFamily,
                             fontWeight = FontWeight.Bold,
                             fontSize = 16.sp,
-                            color = AppDark
+                            color = if (canPublish) Color.White else AppOnDisabled
                         )
                     }
                 }
+                Spacer(Modifier.height(16.dp))
             }
         }
     }

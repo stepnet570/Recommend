@@ -1,170 +1,176 @@
 # TrustList — Project Context for Claude
 
-## 🎯 Проект: TrustList
-Социальная сеть для честных локальных рекомендаций внутри круга доверия ("стаи").
-Встроенная биржа микро-инфлюенсеров: бизнес платит TrustCoins пользователям за нативное размещение.
+## 🎯 Project: TrustList
+A social network for honest local recommendations within a trust circle ("pack").
+Built-in micro-influencer marketplace: businesses pay TrustCoins to users for native content placement.
 
 ---
 
-## 🛠 Стек
+## 🛠 Stack
 - **Android** / Kotlin / Jetpack Compose (Material 3)
 - **Backend:** Firebase Firestore + Firebase Auth
-- **DB path:** `artifacts/trustlist-production/public/data/<коллекция>`
+- **DB path:** `artifacts/trustlist-production/public/data/<collection>`
 
 ---
 
-## 💾 Схема Firestore
+## 💾 Firestore Schema
 
-| Коллекция | Ключевые поля |
-|-----------|--------------|
+| Collection | Key fields |
+|------------|-----------|
 | `users` | uid, email, name, avatar, following[], isBusiness, trustCoins, trustScore |
 | `posts` | userId, title, description, category, location, rating, imageUrl, isSponsored |
 | `collections` | userId, name, postIds[] |
-| `requests` | — (Зов стаи) |
-| `answers` | — (ответы на запросы) |
+| `requests` | — (Pack Call / Зов стаи) |
+| `answers` | — (replies to requests) |
 | `offers` | businessId, title, rewardCoins, minTrustScore, status |
 
 ---
 
-## 🎨 Дизайн-система "Artisan Pastel"
+## 🎨 Design System "Artisan Pastel" (updated)
 
-> ⚠️ Реальные токены из `ui/theme/Color.kt` — используй только их, не CLAUDE.md как источник правды.
+> ⚠️ Source of truth is `ui/theme/Color.kt` — always read the file, not this doc.
 
 ```kotlin
-// ui/theme/Color.kt — актуальные значения
-val AppLime       = Color(0xFF7AE23A)  // градиент-старт, активные иконки
-val AppTeal       = Color(0xFF3BD4C0)  // градиент-конец, Primary-кнопки
-val AppDark       = Color(0xFF1A2A24)  // DarkPastelAnthracite — основной текст
-val AppBackground = Color(0xFFF6FEFB)  // SoftPastelMint — фон экранов
-val AppMuted      = Color(0xFF6B8C80)  // MutedPastelTeal — второстепенный текст
-val AppGold       = Color(0xFFD4AF37)  // MutedPastelGold — монетизация, TrustCoins
-val AppBorder     = Color(0x263BD4C0)  // полупрозрачный Teal для обводок
-val AppSurface    = Color(0xFF1A3328)  // тёмная поверхность (тёмные карточки)
-val AppWhite      = Color(0xFFFFFFFF)  // белые карточки/оверлеи
-val SurfaceMuted  = Color(0xFFE8F5F0)  // светло-зелёный фон секций
+// ui/theme/Color.kt — current values
+val AppViolet     = Color(0xFF7C6FE0)  // primary accent (replaced Lime), gradient start
+val AppLime       = AppViolet          // alias for backward compatibility
+val AppTeal       = Color(0xFF3BD4C0)  // gradient end, primary buttons
+val AppDark       = Color(0xFF1A2A24)  // main text
+val AppBackground = Color(0xFFF8F7F4)  // warm off-white screen background
+val AppMuted      = Color(0xFF8A9A95)  // secondary text
+val AppGold       = Color(0xFFD4AF37)  // monetization, TrustCoins only
+val AppBorder     = Color(0x263BD4C0)  // semi-transparent Teal for outlines
+val AppSurface    = Color(0xFF1A3328)  // dark surface (dark cards)
+val AppWhite      = Color(0xFFFFFFFF)  // white cards / overlays
+val SurfaceMuted  = Color(0xFFF0EEEB)  // warm neutral for card sections
 
-// Градиент (используется везде: кнопки, активные иконки, FAB)
-Brush.horizontalGradient(listOf(AppLime, AppTeal))  // #7AE23A → #3BD4C0
+// Primary gradient (buttons, FAB, active icons, TrustScoreRing, Pack Call cards)
+Brush.horizontalGradient(listOf(AppViolet, AppTeal))  // #7C6FE0 → #3BD4C0
 
-// Типографика
-Заголовки: Syne (HeadingFontFamily) — R.font.syne_variable
-Текст:     DM Sans (BodyFontFamily)  — R.font.dm_sans_variable
+// Typography
+Headings: Syne (HeadingFontFamily) — R.font.syne_variable
+Body:     DM Sans (BodyFontFamily)  — R.font.dm_sans_variable
 ```
 
-**Алиасы в коде (для совместимости):**
+**Aliases in code (for compatibility):**
 ```kotlin
-SoftPastelMint      = AppBackground  // #F6FEFB
-DarkPastelAnthracite = AppDark       // #1A2A24
-RichPastelCoral     = AppTeal        // #3BD4C0 (исторически — это Teal, не Coral!)
-MutedPastelTeal     = AppMuted       // #6B8C80
-MutedPastelGold     = AppGold        // #D4AF37
+SoftPastelMint       = AppBackground  // #F8F7F4
+DarkPastelAnthracite = AppDark        // #1A2A24
+RichPastelCoral      = AppTeal        // #3BD4C0
+MutedPastelTeal      = AppMuted       // #8A9A95
+MutedPastelGold      = AppGold        // #D4AF37
 ```
 
 ---
 
-## ✅ Что уже сделано
-- FeedScreen с постами, запросами ("Зов стаи"), блоком "Эксклюзивные сделки"
-- AddScreen — создание поста (с категорией, рейтингом, локацией)
-- ProfileScreen — профиль пользователя
-- ExploreScreen — поиск/рекомендации
-- CreateOfferScreen — бизнес создаёт AdOffer
-- AddHubScreen — хаб для бизнес-аккаунта (пост или кампания)
-- MainAppScreen — навигация + маршрутизация по ролям (isBusiness)
-- AcceptOfferSheet — флоу принятия оффера
-- PostDetailScreen, RequestDetailScreen, CollectionDetailScreen — детальные экраны
-- PublicUserProfileScreen — публичный профиль другого пользователя
-- BusinessOfferDetailScreen — детали кампании для бизнеса
+## ✅ Done
+- FeedScreen with posts, Pack Calls (Зов стаи), Exclusive Deals block
+- Redesigned Feed header: greeting + TrustCoins chip
+- Redesigned Pack Pulse: gradient ring around avatars (Violet→Teal)
+- Redesigned Pack Call cards: full gradient background, consistent fixed height
+- TrustScoreRing component replacing star ratings (circular arc, 0–10 scale)
+- AddScreen — post creation (category, rating, location)
+- ProfileScreen — user profile
+- ExploreScreen — search / recommendations
+- CreateOfferScreen — business creates AdOffer campaign
+- AddHubScreen — business action hub (post or campaign)
+- MainAppScreen — navigation + role-based routing (isBusiness)
+- AcceptOfferSheet — offer acceptance flow
+- PostDetailScreen, RequestDetailScreen, CollectionDetailScreen — detail screens
+- PublicUserProfileScreen — public profile of another user
+- BusinessOfferDetailScreen — campaign details for business
 - Firebase Auth + Firestore CRUD
-- FirestorePaths — централизованный путь к данным
-- Data-слой: PostRepository, UserRepository, OfferRepository, RequestRepository, CollectionRepository
-- Модели: Post, UserProfile, AdOffer, PackRequest, PostCollection, Answer
+- FirestorePaths — centralized data path
+- Data layer: PostRepository, UserRepository, OfferRepository, RequestRepository, CollectionRepository
+- Models: Post, UserProfile, AdOffer, PackRequest, PostCollection, Answer
 
 ---
 
-## 🔥 Что нужно сделать (приоритеты)
-1. **TrustScore** — логика начисления/пересчёта рейтинга доверия
-2. **TrustCoins wallet** — экран баланса, история транзакций
-3. **Принятие оффера** — полный флоу: принять → создать sponsored пост → списать коины у бизнеса
-4. **Социальный граф** — подписки/отписки, лента только от "стаи"
-5. **Коллекции** — создание, редактирование, добавление поста в коллекцию
-6. **Notifications** — уведомления о новых запросах, принятых офферах
-7. **Бизнес-кабинет** — аналитика кампаний (сколько постов создано, охват)
-8. **Onboarding** — первый запуск, выбор роли (user / business)
-9. **Image upload** — загрузка фото в Firebase Storage
-10. **Deep links / sharing** — шаринг поста/коллекции
+## 🔥 TODO (priority order)
+1. **TrustScore** — scoring logic, recalculation on new ratings
+2. **TrustCoins wallet** — balance screen, transaction history
+3. **Offer acceptance flow** — accept → create sponsored post → deduct coins from business
+4. **Social graph** — follow/unfollow, feed filtered to pack only
+5. **Collections** — create, edit, add post to collection
+6. **Notifications** — new requests, accepted offers
+7. **Business dashboard** — campaign analytics (posts created, reach)
+8. **Onboarding** — first launch, role selection (user / business)
+9. **Image upload** — photo upload to Firebase Storage
+10. **Deep links / sharing** — share post or collection externally
 
 ---
 
-## 🤖 Активные роли (agency-agents)
+## 🤖 Active Roles (agency-agents)
 
 ### 🏗 Senior Android Developer
-Используй при: написании Kotlin/Compose кода, Firebase интеграции, архитектурных решениях.
-**Правила:**
-- Строго следовать дизайн-системе Artisan Pastel (цвета, шрифты выше)
-- Все Firestore операции — по пути `artifacts/trustlist-production/public/data/`
-- Compose-first, никакого XML
-- Разбивать на переиспользуемые @Composable функции
+Use for: Kotlin/Compose code, Firebase integration, architectural decisions.
+**Rules:**
+- Strictly follow Artisan Pastel design system (colors and fonts above)
+- All Firestore operations use path `artifacts/trustlist-production/public/data/`
+- Compose-first, no XML layouts
+- Break UI into reusable @Composable functions
 
-### 🎨 UI Designer  
-Используй при: проектировании новых экранов, компонентов, улучшении существующего UI.
-**Правила:**
-- Дизайн-токены строго из Artisan Pastel
-- Компоненты: ConvexCardBox, AppTextStyles — переиспользовать
-- Золотой акцент (#D4AF37) — только для монетизации/спонсорства
-- Material 3 компоненты как база
+### 🎨 UI Designer
+Use for: designing new screens, components, improving existing UI.
+**Rules:**
+- Design tokens strictly from Artisan Pastel
+- Reuse components: ConvexCardBox, AppTextStyles, TrustScoreRing
+- Gold accent (#D4AF37) — monetization and sponsorship only
+- Violet (#7C6FE0) — primary interactive accent
+- Material 3 components as base
 
 ### 📐 UX Architect
-Используй при: проектировании флоу, навигации, новых фичей.
-**Правила:**
-- Два типа пользователей: isBusiness true/false — разные UX-флоу
-- Минимум экранов для ключевых действий (принять оффер → 2 тапа)
-- Социальный граф = основной источник контента в ленте
+Use for: flow design, navigation, new feature planning.
+**Rules:**
+- Two user types: isBusiness true/false — different UX flows
+- Minimum screens for key actions (accept offer → 2 taps)
+- Social graph = primary content source in the feed
 
 ### 📸 Instagram Curator (Growth)
-Используй при: планировании виральных механик, UGC, роста аудитории.
-**Применение для TrustList:**
-- Механики шаринга постов/коллекций вне приложения
-- "Зов стаи" как вирусный инструмент (пригласи друга ответить)
-- Визуальное оформление sponsored-постов (нативно, не как реклама)
+Use for: viral mechanics, UGC, audience growth.
+**Application for TrustList:**
+- Post/collection sharing mechanics outside the app
+- "Pack Call" as a viral tool (invite a friend to answer)
+- Visual styling of sponsored posts (native, not ad-like)
 
 ---
 
-## ⚡ Быстрые команды
+## ⚡ Quick Commands
 
-**Сгенерировать новый экран:**
-> Роль: Senior Android Developer + UI Designer.
-> Создай [ИмяЭкрана].kt в стиле Artisan Pastel. Используй Firestore путь выше.
+**Generate a new screen:**
+> Role: Senior Android Developer + UI Designer.
+> Create [ScreenName].kt in Artisan Pastel style. Use Firestore path above.
 
-**Добавить бизнес-логику:**
-> Роль: Senior Android Developer.
-> Добавь логику [описание] в [файл]. Данные из Firestore коллекции [имя].
+**Add business logic:**
+> Role: Senior Android Developer.
+> Add logic [description] to [file]. Data from Firestore collection [name].
 
-**Спроектировать новый флоу:**
-> Роль: UX Architect.
-> Спроектируй флоу для [фича]. Учти два типа пользователей (isBusiness).
+**Design a new flow:**
+> Role: UX Architect.
+> Design flow for [feature]. Account for two user types (isBusiness).
 
-**Улучшить UI компонент:**
-> Роль: UI Designer.
-> Улучши компонент [имя] используя токены Artisan Pastel. Добавь состояния: loading, empty, error.
+**Improve a UI component:**
+> Role: UI Designer.
+> Improve component [name] using Artisan Pastel tokens. Add states: loading, empty, error.
 
 ---
 
-## 📁 Ключевые файлы
+## 📁 Key Files
 ```
 app/src/main/java/com/example/recommend/
-├── MainAppScreen.kt               # Bottom nav + dialog выхода из creation flow
-├── navigation/AppNavigation.kt    # NavHost + ВСЕ overlay-состояния (activeRequest, openPostId и т.д.)
-├── ui/feed/FeedScreen.kt          # Лента + Зов стаи + Офферы
-├── ui/feed/FeedViewModel.kt       # Все данные для Feed + текущий пользователь
-├── ui/add/AddScreen.kt            # Создание поста
-├── ui/profile/ProfileScreen.kt    # Профиль
-├── ui/profile/ProfileViewModel.kt # Данные профиля
-├── ui/explore/ExploreScreen.kt    # Поиск
-├── ui/auth/AuthScreen.kt          # Авторизация
-├── CreateOfferScreen.kt           # Бизнес: создать кампанию
-├── AddHubScreen.kt                # Бизнес: хаб действий
-├── AcceptOfferSheet.kt            # Принятие оффера (bottom sheet)
-├── FirestorePaths.kt              # Единый путь к данным Firestore
+├── MainAppScreen.kt               # Bottom nav + exit creation flow dialog
+├── navigation/AppNavigation.kt    # NavHost + ALL overlay states (activeRequest, openPostId, etc.)
+├── ui/feed/FeedScreen.kt          # Feed + Pack Call + Deals + TrustScoreRing
+├── ui/feed/FeedViewModel.kt       # All Feed data + current user
+├── ui/add/AddScreen.kt            # Post creation
+├── ui/profile/ProfileScreen.kt    # User profile
+├── ui/profile/ProfileViewModel.kt # Profile data
+├── ui/explore/ExploreScreen.kt    # Search / explore
+├── ui/auth/AuthScreen.kt          # Authentication
+├── CreateOfferScreen.kt           # Business: create campaign
+├── AddHubScreen.kt                # Business: action hub
+├── AcceptOfferSheet.kt            # Offer acceptance (bottom sheet)
+├── FirestorePaths.kt              # Single source of truth for Firestore paths
 ├── data/model/                    # Post, UserProfile, AdOffer, PackRequest, PostCollection
 ├── data/repository/               # PostRepository, UserRepository, OfferRepository, ...
 └── ui/theme/                      # Color.kt, Type.kt, Theme.kt, Convex.kt
@@ -172,22 +178,22 @@ app/src/main/java/com/example/recommend/
 
 ---
 
-## 🚨 Важные ограничения
-- **НЕ менять** путь Firestore (`trustlist-production`)
-- **НЕ использовать** XML layouts — только Compose
-- **НЕ хардкодить** цвета — только из `ui/theme/Color.kt` (переменные `App*`)
-- **НЕ хардкодить** `Color(0xFF...)` инлайн — только именованные токены
+## 🚨 Hard Constraints
+- **DO NOT change** Firestore path (`trustlist-production`)
+- **DO NOT use** XML layouts — Compose only
+- **DO NOT hardcode** colors — only named tokens from `ui/theme/Color.kt` (`App*` variables)
+- **DO NOT inline** `Color(0xFF...)` — use named tokens only
 - Firebase project ID: `trustlist-fc435`
 
 ---
 
-## ⚠️ Известный технический долг (учитывай при разработке)
+## ⚠️ Known Technical Debt
 
-| Проблема | Где | Влияние |
-|----------|-----|---------|
-| Лента не фильтрует по `following` | `FeedViewModel.feedPostsForHome` | Соцграф не работает |
-| Нет пагинации | `PostRepository`, `UserRepository` | Масштабируемость |
-| 20+ параметров в `AppNavigation` | `navigation/AppNavigation.kt` | Сложность поддержки |
-| `authorName = "Alex"` дефолт | `data/model/Post.kt` | Баги в продакшене |
-| `isMinifyEnabled = false` в release | `app/build.gradle.kts` | Размер APK, безопасность |
-| `applicationId = "com.example.recommend"` | `app/build.gradle.kts` | Нужно сменить до релиза |
+| Issue | Where | Impact |
+|-------|-------|--------|
+| ~~Feed not filtered by `following`~~ | ✅ Fixed | — |
+| No pagination | `PostRepository`, `UserRepository` | Scalability |
+| 20+ parameters in `AppNavigation` | `navigation/AppNavigation.kt` | Maintenance complexity |
+| `authorName = "Alex"` default | `data/model/Post.kt` | Production bugs |
+| `isMinifyEnabled = false` in release | `app/build.gradle.kts` | APK size, security |
+| `applicationId = "com.example.recommend"` | `app/build.gradle.kts` | Must change before release |

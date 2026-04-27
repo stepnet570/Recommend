@@ -40,6 +40,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import kotlin.math.roundToInt
 import java.util.Locale
 import java.util.concurrent.TimeUnit
@@ -60,63 +65,126 @@ import com.example.recommend.ui.theme.SurfacePastel
 import androidx.compose.ui.graphics.Brush
 import com.example.recommend.ui.theme.PrimaryGradient
 import com.example.recommend.ui.theme.AppDark
+import com.example.recommend.ui.theme.AppBackground
+import com.example.recommend.ui.theme.AppViolet
+import com.example.recommend.ui.theme.AppMuted
+import com.example.recommend.ui.theme.AppTeal
+import com.example.recommend.ui.theme.AppGold
+import com.example.recommend.ui.theme.AppWhite
 import com.example.recommend.ui.theme.PrimaryGradientLinear
 
 
 
-/** Label for the collective average; [ratingCount] is how many people rated (may be 0). */
+/** Label for the collective trust score; [ratingCount] is how many people rated (may be 0). */
 private fun audienceAverageRatingLabel(ratingCount: Int): String =
-    "Average reader rating ($ratingCount)"
+    if (ratingCount == 0) "No ratings yet" else "$ratingCount ratings"
 
+/**
+ * TrustScoreRing — premium replacement for star ratings.
+ * Displays a circular arc filled proportionally to [score] (0..10),
+ * rendered with the Violet→Teal gradient from the design system.
+ */
 @Composable
-private fun AudienceAverageStarsDisplay(
-    ratingCount: Int,
-    averageRounded: Int?
+fun TrustScoreRing(
+    score: Float,
+    modifier: Modifier = Modifier,
+    size: Dp = 48.dp,
+    strokeWidth: Dp = 4.dp
 ) {
-    Row {
-        if (ratingCount == 0) {
-            repeat(5) {
-                Icon(
-                    Icons.Filled.Star,
-                    contentDescription = null,
-                    tint = SurfaceMuted,
-                    modifier = Modifier.size(16.dp)
+    val sweepAngle = (score / 10f).coerceIn(0f, 1f) * 300f
+    val trackColor = Color(0xFFE8E6E2)
+
+    Box(
+        modifier = modifier.size(size),
+        contentAlignment = Alignment.Center
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val stroke = Stroke(width = strokeWidth.toPx(), cap = StrokeCap.Round)
+            val inset = strokeWidth.toPx() / 2f
+            val arcSize = Size(this.size.width - inset * 2, this.size.height - inset * 2)
+            val topLeft = Offset(inset, inset)
+
+            // Track arc (background)
+            drawArc(
+                color = trackColor,
+                startAngle = 120f,
+                sweepAngle = 300f,
+                useCenter = false,
+                topLeft = topLeft,
+                size = arcSize,
+                style = stroke
+            )
+            // Filled arc — Violet→Teal via sweep gradient
+            if (sweepAngle > 0f) {
+                drawArc(
+                    brush = Brush.sweepGradient(
+                        colorStops = arrayOf(
+                            0.0f to AppViolet,
+                            1.0f to AppTeal
+                        ),
+                        center = Offset(this.size.width / 2f, this.size.height / 2f)
+                    ),
+                    startAngle = 120f,
+                    sweepAngle = sweepAngle,
+                    useCenter = false,
+                    topLeft = topLeft,
+                    size = arcSize,
+                    style = stroke
                 )
             }
-        } else {
-            val n = (averageRounded ?: 1).coerceIn(1, 5)
-            repeat(n) {
-                Icon(
-                    Icons.Filled.Star,
-                    contentDescription = null,
-                    tint = MutedPastelTeal,
-                    modifier = Modifier.size(16.dp)
-                )
-            }
+        }
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = if (score <= 0f) "—" else if (score % 1f == 0f) score.toInt().toString() else String.format("%.1f", score),
+                fontFamily = HeadingFontFamily,
+                fontWeight = FontWeight.ExtraBold,  // wght=800, matches HTML SVG font-weight="800"
+                fontSize = (size.value * 0.26f).sp,
+                color = AppDark,
+                maxLines = 1
+            )
         }
     }
 }
 
+/**
+ * Interactive trust score picker — replaces YourRatingStarsRow.
+ * Shows 5 dot-buttons that map to scores 2, 4, 6, 8, 10.
+ */
 @Composable
-private fun YourRatingStarsRow(
-    myStars: Int,
+private fun YourTrustScorePicker(
+    myStars: Int,       // existing 1-5 star value stored in Firestore
     onPickStar: (Int) -> Unit,
-    starSize: Dp = 24.dp
+    modifier: Modifier = Modifier
 ) {
     Row(
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         for (star in 1..5) {
-            val selected = myStars >= star
-            Icon(
-                Icons.Filled.Star,
-                contentDescription = "Rate $star",
-                tint = if (selected) MutedPastelGold else SurfaceMuted,
+            val filled = myStars >= star
+            Box(
                 modifier = Modifier
-                    .size(starSize)
-                    .clickable { onPickStar(star) }
-            )
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .background(
+                        if (filled) AppTeal.copy(alpha = 0.15f)
+                        else Color(0xFFE8E6E2)
+                    )
+                    .clickable { onPickStar(star) },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "${star * 2}",
+                    fontFamily = HeadingFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 10.sp,
+                    color = if (filled) AppTeal else AppMuted
+                )
+            }
         }
     }
 }
@@ -214,6 +282,11 @@ fun FeedScreen(
     onWalletClick: () -> Unit = {}
 ) {
     var searchQuery by remember { mutableStateOf("") }
+    val currentUserName = remember(viewerUid, users) {
+        users.find { it.uid == viewerUid }?.name
+            ?.trim()?.split(Regex("\\s+"))?.firstOrNull()
+            .orEmpty()
+    }
 
     val friendPackRequests = remember(requests, viewerUid, followingUserIds) {
         val uid = viewerUid
@@ -245,7 +318,7 @@ fun FeedScreen(
         requests.filter { it.status.equals("active", ignoreCase = true) }
     }
 
-    Scaffold(containerColor = Color.White) { paddingValues ->
+    Scaffold(containerColor = AppBackground) { paddingValues ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -255,11 +328,16 @@ fun FeedScreen(
             verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             item {
-                FeedTopBarRow(
-                    searchQuery = searchQuery,
-                    onSearchChange = { searchQuery = it },
+                FeedGreetingRow(
+                    userName = currentUserName,
                     trustCoins = trustCoins,
                     onWalletClick = onWalletClick
+                )
+            }
+            item {
+                FeedSearchBar(
+                    searchQuery = searchQuery,
+                    onSearchChange = { searchQuery = it }
                 )
             }
 
@@ -465,94 +543,177 @@ private fun PackSignalRequestCard(
 ) {
     val isMine = viewerUid != null && request.authorId == viewerUid
     val authorName = authorUser?.name?.takeIf { it.isNotBlank() } ?: "Member"
+    val recipients = request.selectedUsers.distinct().filter { it.isNotBlank() }
 
-    Card(
+    Box(
         modifier = Modifier
             .width(PackSignalCardWidth)
-            .height(PackSignalCardHeight),
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+            .height(PackSignalCardHeight)   // fixed height — both variants identical
+            .clip(RoundedCornerShape(24.dp))
+            .background(brush = PrimaryGradientLinear)
+            .clickable { onSignalRequestOpen(request) }
     ) {
+        // Decorative circle
+        Box(
+            modifier = Modifier
+                .size(100.dp)
+                .offset(x = 210.dp, y = (-20).dp)
+                .background(Color.White.copy(alpha = 0.07f), CircleShape)
+        )
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp),
+                .padding(18.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .clickable { onSignalRequestOpen(request) },
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                if (isMine) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                // Tag pill
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(Color.White.copy(alpha = 0.20f))
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    Text("🐺", fontSize = 12.sp)
                     Text(
-                        text = "Your signal",
-                        style = AppTextStyles.BodySmall,
-                        color = DarkPastelAnthracite.copy(alpha = 0.55f)
-                    )
-                    PackSignalRecipientsStrip(
-                        selectedUserIds = request.selectedUsers,
-                        users = users,
-                        onUserClick = onRecipientProfileClick
-                    )
-                    Text(
-                        text = request.text,
-                        style = PackSignalQuestionStyle,
-                        color = DarkPastelAnthracite,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                } else {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.clickable { onAuthorClick(request.userId) }
-                    ) {
-                        FeedUserAvatar(
-                            imageUrl = authorUser?.avatar,
-                            displayName = authorName,
-                            fallbackSeed = request.userId,
-                            size = 24.dp
-                        )
-                        Text(
-                            text = "$authorName is asking:",
-                            style = AppTextStyles.BodySmall,
-                            color = DarkPastelAnthracite.copy(alpha = 0.75f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                    PackSignalRecipientsStrip(
-                        selectedUserIds = request.selectedUsers,
-                        users = users,
-                        onUserClick = onRecipientProfileClick
-                    )
-                    Text(
-                        text = request.text,
-                        style = PackSignalQuestionStyle,
-                        color = DarkPastelAnthracite,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
+                        text = if (isMine) "My call" else "Pack call",
+                        fontFamily = BodyFontFamily,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 11.sp,
+                        color = Color.White
                     )
                 }
+
+                // User row — always present, same height
+                // Mine: show who is being asked (recipients)
+                // Others: show who is asking (author)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.clickable {
+                        if (isMine) { /* no-op or open recipients */ }
+                        else onAuthorClick(request.userId)
+                    }
+                ) {
+                    if (isMine) {
+                        // Show first 3 recipients or "+" placeholder
+                        if (recipients.isEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .size(22.dp)
+                                    .background(Color.White.copy(alpha = 0.25f), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("+", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                            }
+                            Text(
+                                text = "Send to pack",
+                                fontFamily = BodyFontFamily,
+                                fontSize = 11.sp,
+                                color = Color.White.copy(alpha = 0.75f)
+                            )
+                        } else {
+                            recipients.take(3).forEach { uid ->
+                                val profile = users.find { it.uid == uid }
+                                if (profile != null) {
+                                    FeedUserAvatar(
+                                        imageUrl = profile.avatar,
+                                        displayName = profile.name,
+                                        fallbackSeed = uid,
+                                        size = 22.dp,
+                                        modifier = Modifier.clickable { onRecipientProfileClick(uid) }
+                                    )
+                                } else {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(22.dp)
+                                            .background(Color.White.copy(alpha = 0.25f), CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("+", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                            if (recipients.size > 3) {
+                                Text(
+                                    text = "+${recipients.size - 3}",
+                                    fontFamily = BodyFontFamily,
+                                    fontSize = 11.sp,
+                                    color = Color.White.copy(alpha = 0.75f)
+                                )
+                            }
+                        }
+                    } else {
+                        // Show author
+                        if (authorUser != null) {
+                            FeedUserAvatar(
+                                imageUrl = authorUser.avatar,
+                                displayName = authorName,
+                                fallbackSeed = request.userId,
+                                size = 22.dp
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .size(22.dp)
+                                    .background(Color.White.copy(alpha = 0.25f), CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("+", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        Text(
+                            text = "$authorName is asking",
+                            fontFamily = BodyFontFamily,
+                            fontSize = 11.sp,
+                            color = Color.White.copy(alpha = 0.75f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                // Question text
+                Text(
+                    text = request.text,
+                    fontFamily = HeadingFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    color = Color.White,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    lineHeight = 21.sp
+                )
             }
+
+            // Action button pinned to bottom
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .background(brush = PrimaryGradient, shape = RoundedCornerShape(12.dp))
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color.White.copy(alpha = 0.95f))
                     .clickable { if (isMine) onSignalRequestOpen(request) else onHelpRequest(request) }
-                    .padding(vertical = 10.dp),
-                contentAlignment = Alignment.Center
+                    .padding(horizontal = 16.dp, vertical = 9.dp)
             ) {
-                Text(
-                    text = if (isMine) "See my pick" else "Help",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    Text(
+                        text = if (isMine) "My picks" else "Reply",
+                        fontFamily = BodyFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        color = AppViolet
+                    )
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        tint = AppViolet,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
             }
         }
     }
@@ -619,21 +780,35 @@ private fun PackPulseStoryItem(
     }
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.width(78.dp)
+        modifier = Modifier.width(72.dp)
     ) {
+        // Gradient ring — Violet → Teal like Instagram stories
         Box(
             modifier = Modifier
-                .size(72.dp)
+                .size(68.dp)
                 .clickable(onClick = onAvatarClick),
             contentAlignment = Alignment.Center
         ) {
-            FeedUserAvatar(
-                imageUrl = user.avatar,
-                displayName = user.name,
-                fallbackSeed = user.uid,
-                size = 72.dp,
-                modifier = Modifier.align(Alignment.Center)
+            // Gradient ring background
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(brush = PrimaryGradientLinear, shape = CircleShape)
             )
+            // White gap between ring and avatar
+            Box(
+                modifier = Modifier
+                    .size(62.dp)
+                    .background(AppBackground, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                FeedUserAvatar(
+                    imageUrl = user.avatar,
+                    displayName = user.name,
+                    fallbackSeed = user.uid,
+                    size = 56.dp
+                )
+            }
         }
         Spacer(modifier = Modifier.height(6.dp))
         Text(
@@ -648,56 +823,95 @@ private fun PackPulseStoryItem(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** Greeting header row — "Good morning, [Name] 👋" + coins chip */
 @Composable
-private fun FeedTopBarRow(
-    searchQuery: String,
-    onSearchChange: (String) -> Unit,
+private fun FeedGreetingRow(
+    userName: String,
     trustCoins: Int,
     onWalletClick: () -> Unit
 ) {
-    val scheme = MaterialTheme.colorScheme
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        AppTextField(
-            value = searchQuery,
-            onValueChange = onSearchChange,
-            modifier = Modifier.weight(1f),
-            placeholder = "Where's the best ceja de bife?",
-            singleLine = true,
-            shape = RoundedCornerShape(18.dp),
-            containerColor = AppWhite,
-            leadingIcon = {
-                Icon(Icons.Filled.Search, contentDescription = null, tint = AppTeal)
-            }
-        )
+        Column {
+            Text(
+                text = "Good morning,",
+                fontFamily = BodyFontFamily,
+                fontWeight = FontWeight.Normal,
+                fontSize = 13.sp,
+                color = AppMuted
+            )
+            Text(
+                text = if (userName.isNotBlank()) "$userName 👋" else "Hey there 👋",
+                fontFamily = HeadingFontFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 22.sp,
+                color = AppDark
+            )
+        }
 
+        // Coins chip
         Row(
             modifier = Modifier
-                .clip(RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(14.dp))
+                .background(AppGold.copy(alpha = 0.10f))
                 .clickable(onClick = onWalletClick)
-                .padding(horizontal = 8.dp, vertical = 10.dp),
+                .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Icon(
                 Icons.Filled.AccountBalanceWallet,
                 contentDescription = null,
-                tint = MutedPastelTeal,
-                modifier = Modifier.size(22.dp)
+                tint = AppGold,
+                modifier = Modifier.size(18.dp)
             )
             Text(
                 text = trustCoins.toString(),
                 fontFamily = HeadingFontFamily,
                 fontWeight = FontWeight.Bold,
-                fontSize = 17.sp,
-                color = DarkPastelAnthracite
+                fontSize = 15.sp,
+                color = AppGold
+            )
+            Text(
+                text = "TC",
+                fontFamily = BodyFontFamily,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = 11.sp,
+                color = AppGold.copy(alpha = 0.7f)
             )
         }
     }
+}
+
+/** Standalone search bar below the greeting */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FeedSearchBar(
+    searchQuery: String,
+    onSearchChange: (String) -> Unit
+) {
+    AppTextField(
+        value = searchQuery,
+        onValueChange = onSearchChange,
+        modifier = Modifier.fillMaxWidth(),
+        placeholder = "Search the pack...",
+        singleLine = true,
+        shape = RoundedCornerShape(16.dp),
+        containerColor = AppWhite,
+        leadingIcon = {
+            Icon(
+                Icons.Filled.Search,
+                contentDescription = null,
+                tint = AppMuted,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    )
 }
 
 @Composable
@@ -898,6 +1112,10 @@ private fun PackFriendsSection(
     }
 }
 
+/**
+ * "Зов стаи" card — full Violet→Teal gradient background,
+ * matching the design screenshot.
+ */
 @Composable
 private fun PackFriendRequestCard(
     request: PackRequest,
@@ -905,61 +1123,102 @@ private fun PackFriendRequestCard(
     onOpen: () -> Unit,
     onAuthorClick: () -> Unit
 ) {
-    Surface(
+    Box(
         modifier = Modifier
-            .width(280.dp)
-            .height(168.dp),
-        shape = RoundedCornerShape(24.dp),
-        color = Color.White,
-        shadowElevation = 4.dp,
-        tonalElevation = 0.dp
+            .width(300.dp)
+            .clip(RoundedCornerShape(24.dp))
+            .background(brush = PrimaryGradientLinear)
+            .clickable(onClick = onOpen)
     ) {
+        // Decorative circles for depth
+        Box(
+            modifier = Modifier
+                .size(120.dp)
+                .offset(x = 200.dp, y = (-30).dp)
+                .background(Color.White.copy(alpha = 0.07f), CircleShape)
+        )
+        Box(
+            modifier = Modifier
+                .size(80.dp)
+                .offset(x = 220.dp, y = 80.dp)
+                .background(Color.White.copy(alpha = 0.05f), CircleShape)
+        )
+
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.SpaceBetween
+                .fillMaxWidth()
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text(
-                text = request.text,
-                style = AppTextStyles.BodyMedium,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 3,
-                overflow = TextOverflow.Ellipsis,
-                color = DarkPastelAnthracite,
-                modifier = Modifier.clickable(onClick = onOpen)
-            )
+            // Tag pill
             Row(
-                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onAuthorClick)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color.White.copy(alpha = 0.20f))
+                    .padding(horizontal = 12.dp, vertical = 5.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                FeedUserAvatar(
-                    imageUrl = author.avatar,
-                    displayName = author.name.ifBlank { "Friend" },
-                    fallbackSeed = author.uid,
-                    size = 32.dp
-                )
-                Spacer(modifier = Modifier.width(8.dp))
+                Text("🐺", fontSize = 13.sp)
                 Text(
-                    text = author.name.ifBlank { "Friend" },
-                    style = AppTextStyles.BodySmall,
-                    color = DarkPastelAnthracite.copy(alpha = 0.55f),
-                    modifier = Modifier.weight(1f)
+                    text = "Pack call",
+                    fontFamily = BodyFontFamily,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 12.sp,
+                    color = Color.White
                 )
             }
-            TextButton(
-                onClick = onOpen,
-                colors = ButtonDefaults.textButtonColors(contentColor = AppDark)
+
+            // Question text
+            Text(
+                text = request.text,
+                fontFamily = HeadingFontFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 17.sp,
+                color = Color.White,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                lineHeight = 22.sp
+            )
+
+            // Author + answer count
+            Text(
+                text = "${author.name.ifBlank { "Friend" }} is asking",
+                fontFamily = BodyFontFamily,
+                fontWeight = FontWeight.Normal,
+                fontSize = 13.sp,
+                color = Color.White.copy(alpha = 0.75f),
+                modifier = Modifier.clickable(onClick = onAuthorClick)
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            // Reply button
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color.White.copy(alpha = 0.95f))
+                    .clickable(onClick = onOpen)
+                    .padding(horizontal = 18.dp, vertical = 10.dp)
             ) {
-                Text("Reply", fontWeight = FontWeight.Bold)
-                Spacer(Modifier.width(4.dp))
-                Icon(
-                    Icons.AutoMirrored.Filled.ArrowForward,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = "Reply",
+                        fontFamily = BodyFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = AppViolet
+                    )
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        tint = AppViolet,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
             }
         }
     }
@@ -1005,6 +1264,46 @@ private fun PackAskEmptyCard(onAskPackClick: () -> Unit) {
     }
 }
 
+// ─── Category → emoji + gradient ─────────────────────────────────────────────
+
+data class CategoryStyle(val emoji: String, val gradient: Brush)
+
+fun categoryStyle(category: String): CategoryStyle {
+    val c = category.trim().lowercase()
+    return when {
+        c.contains("coffee") || c.contains("кофе") -> CategoryStyle(
+            emoji = "☕",
+            gradient = Brush.linearGradient(
+                listOf(Color(0xFFF5E6D3), Color(0xFFEDD5B3)),
+                start = Offset(0f, 0f), end = Offset(500f, 500f)
+            )
+        )
+        c.contains("food") || c.contains("еда") || c.contains("ramen") || c.contains("рест") -> CategoryStyle(
+            emoji = "🍜",
+            gradient = Brush.linearGradient(
+                listOf(Color(0xFFE8F5E9), Color(0xFFC8E6C9)),
+                start = Offset(0f, 0f), end = Offset(500f, 500f)
+            )
+        )
+        c.contains("place") || c.contains("bar") || c.contains("бар") || c.contains("resto") -> CategoryStyle(
+            emoji = "🗺️",
+            gradient = Brush.linearGradient(
+                listOf(Color(0xFFE3F2FD), Color(0xFFBBDEFB)),
+                start = Offset(0f, 0f), end = Offset(500f, 500f)
+            )
+        )
+        else -> CategoryStyle(
+            emoji = "⭐",
+            gradient = Brush.linearGradient(
+                listOf(AppViolet.copy(alpha = 0.12f), AppTeal.copy(alpha = 0.12f)),
+                start = Offset(0f, 0f), end = Offset(500f, 500f)
+            )
+        )
+    }
+}
+
+// ─── FeedPostCard — точно по HTML .post-card ─────────────────────────────────
+
 @Composable
 fun FeedPostCard(
     post: Post,
@@ -1017,228 +1316,355 @@ fun FeedPostCard(
     onOpenPost: ((String) -> Unit)? = null
 ) {
     val authorUser = users.find { it.uid == post.userId }
-    val iconTint = MutedPastelTeal
-    val isOwnPost = post.userId.isNotBlank() && viewerUid != null && post.userId == viewerUid
-    val canRateOthers = viewerUid != null && !isOwnPost
-    val myAudienceStars = viewerUid?.let { post.ratingsByUser[it] } ?: 0
-    val audienceAvgRounded = post.averageAudienceRatingStars()
-    val cardBorder = if (post.isSponsored) {
-        Modifier.border(2.dp, MutedPastelGold, RoundedCornerShape(28.dp))
-    } else Modifier
+    val authorName = post.authorName.ifBlank { authorUser?.name.orEmpty().ifBlank { "Pack member" } }
+    val isOwnPost = viewerUid != null && post.userId == viewerUid
+    val myRating = viewerUid?.let { post.ratingsByUser[it] } ?: 0
+    var showRatingDialog by remember { mutableStateOf(false) }
 
-    val openPostModifier = if (onOpenPost != null) {
-        Modifier.clickable { onOpenPost(post.id) }
-    } else Modifier
+    val trustScore = remember(post.ratingsByUser) {
+        if (post.ratingsByUser.isEmpty()) 0f
+        else ((post.averageAudienceRatingStars() ?: 0) * 2).toFloat()
+    }.coerceIn(0f, 10f)
 
-    Column(modifier = Modifier.fillMaxWidth()) {
-        ConvexCardBox(
-            modifier = Modifier
-                .fillMaxWidth()
-                .then(cardBorder),
-            shape = RoundedCornerShape(28.dp),
-            elevation = 18.dp
-        ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            if (!post.imageUrl.isNullOrBlank()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(220.dp)
-                        .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-                        .then(openPostModifier)
-                ) {
+    val catStyle = remember(post.category) { categoryStyle(post.category) }
+
+    // post-card: white, radius 20dp, shadow, thin border
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = AppWhite,
+        shadowElevation = 2.dp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, Color.Black.copy(alpha = 0.04f), RoundedCornerShape(20.dp))
+            .then(if (onOpenPost != null) Modifier.clickable { onOpenPost(post.id) } else Modifier)
+    ) {
+        Column {
+
+            // ── post-img: 160dp, gradient or real image ───────────────────────
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(160.dp)
+                    .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+            ) {
+                if (!post.imageUrl.isNullOrBlank()) {
                     AsyncImage(
                         model = post.imageUrl,
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop,
-                        placeholder = ColorPainter(SoftPastelMint),
-                        error = ColorPainter(SoftPastelMint)
+                        placeholder = ColorPainter(SurfaceMuted),
+                        error = ColorPainter(SurfaceMuted)
                     )
-                    if (post.isSponsored) {
-                        Surface(
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(8.dp),
-                            shape = RoundedCornerShape(8.dp),
-                            color = MutedPastelGold.copy(alpha = 0.15f)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(Icons.Filled.Stars, null, tint = MutedPastelGold, modifier = Modifier.size(12.dp))
-                                Spacer(Modifier.width(4.dp))
-                                Text(
-                                    "Sponsored",
-                                    style = AppTextStyles.BodySmall,
-                                    color = MutedPastelGold,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
+                } else {
+                    // Gradient placeholder with category emoji
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(catStyle.gradient),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(catStyle.emoji, fontSize = 52.sp)
                     }
                 }
-            }
 
-            Box(modifier = Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 14.dp)
-                    .then(if (post.imageUrl.isNullOrBlank()) openPostModifier else Modifier),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .background(SurfaceMuted, RoundedCornerShape(8.dp))
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                ) {
-                    Text(
-                        post.category.uppercase(),
-                        style = AppTextStyles.BodySmall,
-                        fontWeight = FontWeight.Bold,
-                        color = DarkPastelAnthracite.copy(alpha = 0.7f)
-                    )
-                }
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(enabled = post.userId.isNotBlank()) { onUserProfileClick(post.userId) },
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    FeedUserAvatar(
-                        imageUrl = authorUser?.avatar,
-                        displayName = post.authorName.ifBlank { authorUser?.name.orEmpty() },
-                        fallbackSeed = post.userId,
-                        size = 40.dp
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        post.authorName,
-                        style = AppTextStyles.BodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = DarkPastelAnthracite,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                Text(
-                    post.title,
-                    style = AppTextStyles.Heading2.copy(fontSize = 20.sp),
-                    color = DarkPastelAnthracite,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = openPostModifier
-                )
-
-                Text(
-                    post.description,
-                    style = AppTextStyles.BodyMedium,
-                    color = DarkPastelAnthracite.copy(alpha = 0.85f),
-                    lineHeight = 22.sp,
-                    maxLines = 4,
-                    overflow = TextOverflow.Ellipsis
-                )
-                post.resourceUrl?.takeIf { it.isNotBlank() }?.let { url ->
-                    Spacer(modifier = Modifier.height(10.dp))
-                    PostLinkPreviewCard(url)
-                }
-            }
-            if (post.isSponsored && post.imageUrl.isNullOrBlank()) {
-                Surface(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(8.dp),
-                    shape = RoundedCornerShape(8.dp),
-                    color = MutedPastelGold.copy(alpha = 0.15f)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                // sponsored-badge
+                if (post.isSponsored) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(10.dp)
+                            .background(AppGold, RoundedCornerShape(6.dp))
+                            .padding(horizontal = 8.dp, vertical = 3.dp)
                     ) {
-                        Icon(Icons.Filled.Stars, null, tint = MutedPastelGold, modifier = Modifier.size(12.dp))
-                        Spacer(Modifier.width(4.dp))
                         Text(
-                            "Sponsored",
-                            style = AppTextStyles.BodySmall,
-                            color = MutedPastelGold,
-                            fontWeight = FontWeight.Bold
+                            text = "Sponsored",
+                            fontFamily = BodyFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 10.sp,
+                            color = AppWhite
                         )
                     }
                 }
             }
-            } // end content Box
 
-            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+            // ── post-body ─────────────────────────────────────────────────────
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 14.dp)
+            ) {
+                // loc-tag: "📍 location"
+                if (post.location.isNotBlank()) {
                     Text(
-                        audienceAverageRatingLabel(post.ratingsByUser.size),
-                        style = AppTextStyles.BodySmall,
-                        color = DarkPastelAnthracite.copy(alpha = 0.55f),
-                        fontWeight = FontWeight.Bold
-                    )
-                    AudienceAverageStarsDisplay(
-                        ratingCount = post.ratingsByUser.size,
-                        averageRounded = audienceAvgRounded
+                        text = "📍 ${post.location}",
+                        fontFamily = BodyFontFamily,
+                        fontSize = 11.sp,
+                        color = AppMuted,
+                        modifier = Modifier.padding(bottom = 6.dp)
                     )
                 }
-                Spacer(modifier = Modifier.height(8.dp))
-            }
 
-            Column(modifier = Modifier.padding(16.dp)) {
-                HorizontalDivider(color = SurfaceMuted)
-                Spacer(modifier = Modifier.height(12.dp))
+                // post-header: [pill + title] | [TrustScoreRing]
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    if (canRateOthers) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                "Your rating",
-                                style = AppTextStyles.BodySmall,
-                                color = DarkPastelAnthracite.copy(alpha = 0.55f),
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            YourRatingStarsRow(
-                                myStars = myAudienceStars,
-                                onPickStar = { star -> onAudienceRate(post.id, star) },
-                                starSize = 26.dp
-                            )
+                    Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                        // pill-violet: category
+                        if (post.category.isNotBlank()) {
+                            Box(
+                                modifier = Modifier
+                                    .background(AppViolet.copy(alpha = 0.10f), RoundedCornerShape(20.dp))
+                                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = "${catStyle.emoji} ${post.category}",
+                                    fontFamily = BodyFontFamily,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 12.sp,
+                                    color = AppViolet
+                                )
+                            }
+                            Spacer(Modifier.height(6.dp))
                         }
-                    } else {
-                        Spacer(modifier = Modifier.weight(1f))
+                        // post-title: Syne 15/700
+                        Text(
+                            text = post.title,
+                            fontFamily = HeadingFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp,
+                            color = AppDark,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            lineHeight = 20.sp
+                        )
                     }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = { onSaveClick(post.id) }) {
-                            Icon(
-                                if (isSaved) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
-                                contentDescription = null,
-                                tint = iconTint,
-                                modifier = Modifier.size(22.dp)
+                    // TrustScoreRing — кликабельный, открывает рейтинг
+                    Box(
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .clickable(enabled = !isOwnPost && viewerUid != null) {
+                                showRatingDialog = true
+                            }
+                    ) {
+                        TrustScoreRing(
+                            score = trustScore,
+                            size = 44.dp,
+                            strokeWidth = 3.5.dp
+                        )
+                    }
+                }
+
+                // post-desc
+                if (post.description.isNotBlank()) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = post.description,
+                        fontFamily = BodyFontFamily,
+                        fontSize = 13.sp,
+                        color = AppMuted,
+                        lineHeight = 19.5.sp,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                // Link preview (kept from original)
+                post.resourceUrl?.takeIf { it.isNotBlank() }?.let { url ->
+                    Spacer(Modifier.height(8.dp))
+                    PostLinkPreviewCard(url)
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                // post-footer: author-row | actions
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    // author-row
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable(enabled = post.userId.isNotBlank()) {
+                            onUserProfileClick(post.userId)
+                        }
+                    ) {
+                        // av: 28dp gradient circle with initial
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .background(
+                                    Brush.linearGradient(listOf(AppViolet, AppTeal)),
+                                    CircleShape
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = authorName.take(1).uppercase(),
+                                fontFamily = BodyFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp,
+                                color = AppWhite
                             )
                         }
-                        IconButton(onClick = { /* Share */ }) {
-                            Icon(Icons.Filled.Share, contentDescription = null, tint = iconTint, modifier = Modifier.size(22.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = authorName,
+                                fontFamily = BodyFontFamily,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 12.sp,
+                                color = AppDark,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = "Pack member",
+                                fontFamily = BodyFontFamily,
+                                fontSize = 11.sp,
+                                color = AppMuted
+                            )
                         }
+                    }
+
+                    // Подсказка: нажми на кольцо чтобы оценить
+                    if (!isOwnPost && viewerUid != null) {
+                        Text(
+                            text = if (myRating > 0) "★".repeat(myRating) + "☆".repeat(5 - myRating)
+                                   else "Rate ↑",
+                            fontFamily = BodyFontFamily,
+                            fontSize = 12.sp,
+                            color = if (myRating > 0) AppGold else AppMuted,
+                            modifier = Modifier.clickable { showRatingDialog = true }
+                        )
                     }
                 }
             }
         }
     }
+
+    // ── Rating dialog ──────────────────────────────────────────────────────────
+    if (showRatingDialog) {
+        RatingDialog(
+            postTitle = post.title,
+            currentRating = myRating,
+            onDismiss = { showRatingDialog = false },
+            onRate = { stars ->
+                onAudienceRate(post.id, stars)
+                showRatingDialog = false
+            }
+        )
     }
 }
 
+// ─── RatingDialog ─────────────────────────────────────────────────────────────
+
+@Composable
+fun RatingDialog(
+    postTitle: String,
+    currentRating: Int,
+    onDismiss: () -> Unit,
+    onRate: (Int) -> Unit
+) {
+    var selected by remember { mutableIntStateOf(currentRating) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = AppWhite,
+        shape = RoundedCornerShape(24.dp),
+        title = {
+            Text(
+                text = "Rate this pick",
+                fontFamily = HeadingFontFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+                color = AppDark
+            )
+        },
+        text = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = postTitle,
+                    fontFamily = BodyFontFamily,
+                    fontSize = 13.sp,
+                    color = AppMuted,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(bottom = 20.dp)
+                )
+                // 5 звёзд
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    (1..5).forEach { star ->
+                        Text(
+                            text = if (star <= selected) "★" else "☆",
+                            fontSize = 36.sp,
+                            color = if (star <= selected) AppGold else AppMuted.copy(alpha = 0.4f),
+                            modifier = Modifier.clickable { selected = star }
+                        )
+                    }
+                }
+                if (selected > 0) {
+                    Text(
+                        text = when (selected) {
+                            1 -> "Not worth it"
+                            2 -> "Below average"
+                            3 -> "Decent"
+                            4 -> "Really good"
+                            5 -> "Must try!"
+                            else -> ""
+                        },
+                        fontFamily = BodyFontFamily,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.sp,
+                        color = AppViolet,
+                        modifier = Modifier.padding(top = 12.dp)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                    .height(48.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(
+                        if (selected > 0) PrimaryGradientLinear
+                        else Brush.horizontalGradient(listOf(AppDisabled, AppDisabled))
+                    )
+                    .clickable(enabled = selected > 0) { onRate(selected) },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Confirm rating",
+                    fontFamily = BodyFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    color = if (selected > 0) AppWhite else AppOnDisabled
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(
+                    "Cancel",
+                    fontFamily = BodyFontFamily,
+                    fontSize = 14.sp,
+                    color = AppMuted
+                )
+            }
+        }
+    )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 /**
  * Rich link row: favicon (via Google s2), host / Maps title, snippet; tap opens via [openExternalUrl] (Maps app for short links).
  */
@@ -1488,24 +1914,37 @@ fun PostCard(
                 }
             }
 
-            Column(modifier = Modifier.padding(horizontal = 20.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+            // Trust Score row (second instance — alternate card layout)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        "Trust Score",
+                        style = AppTextStyles.BodySmall,
+                        color = DarkPastelAnthracite.copy(alpha = 0.45f),
+                        fontWeight = FontWeight.SemiBold
+                    )
                     Text(
                         audienceAverageRatingLabel(post.ratingsByUser.size),
                         style = AppTextStyles.BodySmall,
-                        color = DarkPastelAnthracite.copy(alpha = 0.55f),
-                        fontWeight = FontWeight.Bold
-                    )
-                    AudienceAverageStarsDisplay(
-                        ratingCount = post.ratingsByUser.size,
-                        averageRounded = audienceAvgRounded
+                        color = DarkPastelAnthracite.copy(alpha = 0.35f)
                     )
                 }
-                Spacer(modifier = Modifier.height(10.dp))
+                val trustScore2 = if (post.ratingsByUser.isEmpty()) {
+                    0f
+                } else {
+                    ((audienceAvgRounded ?: 0) * 2).toFloat()
+                }
+                TrustScoreRing(
+                    score = trustScore2.coerceIn(0f, 10f),
+                    size = 52.dp,
+                    strokeWidth = 4.dp
+                )
             }
 
             Column(modifier = Modifier.padding(20.dp)) {
@@ -1521,14 +1960,13 @@ fun PostCard(
                             Text(
                                 "Your rating",
                                 style = AppTextStyles.BodySmall,
-                                color = DarkPastelAnthracite.copy(alpha = 0.55f),
-                                fontWeight = FontWeight.Bold
+                                color = DarkPastelAnthracite.copy(alpha = 0.45f),
+                                fontWeight = FontWeight.SemiBold
                             )
                             Spacer(modifier = Modifier.height(6.dp))
-                            YourRatingStarsRow(
+                            YourTrustScorePicker(
                                 myStars = myAudienceStars,
-                                onPickStar = { star -> onAudienceRate(post.id, star) },
-                                starSize = 26.dp
+                                onPickStar = { star -> onAudienceRate(post.id, star) }
                             )
                         }
                     } else {

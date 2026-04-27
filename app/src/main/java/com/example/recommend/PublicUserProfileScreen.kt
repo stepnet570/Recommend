@@ -5,8 +5,6 @@ import com.example.recommend.ui.profile.*
 import com.example.recommend.data.model.*
 import com.example.recommend.ui.theme.*
 
-import android.widget.Toast
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -16,49 +14,23 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.AccountBalanceWallet
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.example.recommend.ui.theme.AppTextStyles
-import com.example.recommend.ui.theme.ConvexCardBox
-import com.example.recommend.ui.theme.DarkPastelAnthracite
-import com.example.recommend.ui.theme.GradientMid
-import com.example.recommend.ui.theme.GradientTop
-import com.example.recommend.ui.theme.MutedPastelGold
-import com.example.recommend.ui.theme.MutedPastelTeal
-import com.example.recommend.ui.theme.RichPastelCoral
-import com.example.recommend.ui.theme.SurfaceMuted
-import com.example.recommend.ui.theme.AppLime
-import com.example.recommend.ui.theme.AppTeal
-import com.example.recommend.ui.theme.AppDark
-import com.example.recommend.ui.theme.PrimaryGradientLinear
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
-import java.util.Locale
 
-private enum class PublicProfileSurface {
-    PERSONAL,
-    ADS_CAMPAIGNS
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PublicUserProfileScreen(
     userId: String,
@@ -73,20 +45,19 @@ fun PublicUserProfileScreen(
 ) {
     val profile = remember(userId, allUsers) { allUsers.find { it.uid == userId } }
     val db = FirebaseFirestore.getInstance()
-    val scheme = MaterialTheme.colorScheme
-    val context = LocalContext.current
 
     var theirCollections by remember { mutableStateOf<List<PostCollection>>(emptyList()) }
     var theirOffers by remember { mutableStateOf<List<AdOffer>>(emptyList()) }
     var followersCount by remember { mutableStateOf(0) }
-    var promoterCampaignsCount by remember { mutableStateOf(0) }
 
     val isOwnProfile = userId == viewerUid
     val isFollowing = viewerProfile?.following?.contains(userId) == true
 
-    var profileSurfaceOrdinal by rememberSaveable(userId) { mutableIntStateOf(0) }
     var selectedTab by rememberSaveable(userId) { mutableIntStateOf(0) }
-    val profileSurface = if (profileSurfaceOrdinal == 0) PublicProfileSurface.PERSONAL else PublicProfileSurface.ADS_CAMPAIGNS
+
+    val trustScore = remember(profile?.trustScore) {
+        ((profile?.trustScore ?: 0.0) * 2.0).coerceIn(0.0, 10.0).toFloat()
+    }
 
     DisposableEffect(userId) {
         val regs = mutableListOf<ListenerRegistration>()
@@ -100,7 +71,8 @@ fun PublicUserProfileScreen(
                             id = doc.id,
                             userId = doc.getString("userId") ?: "",
                             name = doc.getString("name") ?: "",
-                            postIds = (doc.get("postIds") as? List<*>)?.mapNotNull { it as? String } ?: emptyList(),
+                            postIds = (doc.get("postIds") as? List<*>)?.mapNotNull { it as? String }
+                                ?: emptyList(),
                             createdAt = doc.getLong("createdAt") ?: 0L
                         )
                     }
@@ -125,11 +97,6 @@ fun PublicUserProfileScreen(
             .whereArrayContains("following", userId)
             .get()
             .addOnSuccessListener { followersCount = it.size() }
-        db.trustListDataRoot()
-            .collection("offers")
-            .whereArrayContains("promoterUserIds", userId)
-            .get()
-            .addOnSuccessListener { promoterCampaignsCount = it.size() }
     }
 
     fun toggleFollow() {
@@ -142,389 +109,275 @@ fun PublicUserProfileScreen(
         }
     }
 
-    fun submitUserTrustRating(stars: Int) {
-        if (viewerProfile == null || userId.isBlank() || isOwnProfile) return
-        val raterUid = viewerUid
-        val targetRef = db.trustListDataRoot().collection("users").document(userId)
-        val score = stars.coerceIn(1, 5)
-        db.runTransaction { transaction ->
-            val snap = transaction.get(targetRef)
-            val raw = snap.get("trustRatings")
-            val existing = when (raw) {
-                is Map<*, *> -> raw.mapNotNull { (k, v) ->
-                    val key = k as? String ?: return@mapNotNull null
-                    val intVal = when (v) {
-                        is Long -> v.toInt()
-                        is Int -> v
-                        else -> null
-                    } ?: return@mapNotNull null
-                    key to intVal.coerceIn(1, 5)
-                }.toMap().toMutableMap()
-                else -> mutableMapOf()
-            }
-            existing[raterUid] = score
-            val newAvg = existing.values.map { it.toDouble() }.average()
-            transaction.update(
-                targetRef,
-                mapOf(
-                    "trustRatings.$raterUid" to score,
-                    "trustScore" to newAvg
-                )
-            )
-            null
-        }.addOnFailureListener { e ->
-            Toast.makeText(
-                context,
-                e.localizedMessage ?: "Couldn't save rating",
-                Toast.LENGTH_SHORT
-            ).show()
+    if (profile == null) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = AppTeal)
         }
+        return
     }
 
-    Scaffold(
-        containerColor = Color.Transparent,
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        "Profile",
-                        style = AppTextStyles.BodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
-                        color = DarkPastelAnthracite
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = MutedPastelTeal
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color.White,
-                    titleContentColor = DarkPastelAnthracite,
-                    navigationIconContentColor = MutedPastelTeal
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(AppBackground),
+        contentPadding = PaddingValues(bottom = 32.dp)
+    ) {
+
+        // ── Cover banner + avatar + follow button ─────────────────────────────
+        item {
+            Box(modifier = Modifier.fillMaxWidth()) {
+
+                // Gradient banner
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(120.dp)
+                        .background(PrimaryGradientLinear)
                 )
-            )
-        }
-    ) { paddingValues ->
-        if (profile == null) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(color = RichPastelCoral)
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-                    .padding(horizontal = 16.dp),
-                contentPadding = PaddingValues(top = 8.dp, bottom = 32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                item {
-                    ConvexCardBox(
+
+                // Back button — top-left, on gradient
+                IconButton(
+                    onClick = onBack,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(4.dp)
+                ) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "Back",
+                        tint = Color.White
+                    )
+                }
+
+                // Avatar — bottom-left, overlapping banner by 36dp
+                Box(
+                    modifier = Modifier
+                        .padding(start = 20.dp)
+                        .align(Alignment.BottomStart)
+                        .offset(y = 36.dp)
+                        .size(72.dp)
+                        .background(AppWhite, CircleShape)
+                        .border(3.dp, AppWhite, CircleShape)
+                        .clip(CircleShape)
+                ) {
+                    AsyncImage(
+                        model = profile.avatar.ifEmpty {
+                            "https://api.dicebear.com/7.x/avataaars/svg?seed=${profile.uid}"
+                        },
+                        contentDescription = "Avatar",
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 20.dp),
-                        shape = RoundedCornerShape(32.dp),
-                        elevation = 22.dp
+                            .fillMaxSize()
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+
+                // Follow / Unfollow button — bottom-right, overlapping banner by 20dp
+                if (!isOwnProfile && viewerProfile != null) {
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 20.dp)
+                            .offset(y = 20.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column(
-                            modifier = Modifier
-                                .padding(28.dp)
-                                .fillMaxWidth(),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            AsyncImage(
-                                model = profile.avatar.ifEmpty { "https://api.dicebear.com/7.x/avataaars/svg?seed=${profile.uid}" },
-                                contentDescription = "Avatar",
+                        if (isFollowing) {
+                            Box(
                                 modifier = Modifier
-                                    .size(100.dp)
-                                    .clip(CircleShape)
-                                    .background(SurfaceMuted),
-                                contentScale = ContentScale.Crop
-                            )
-
-                            Spacer(modifier = Modifier.height(14.dp))
-
-                            Text(profile.name, style = AppTextStyles.Heading2.copy(fontSize = 24.sp))
-                            Text(
-                                profile.handle,
-                                color = DarkPastelAnthracite.copy(alpha = 0.55f),
-                                style = AppTextStyles.BodyMedium,
-                                fontWeight = FontWeight.Medium
-                            )
-
-                            Spacer(modifier = Modifier.height(10.dp))
-
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier
-                                    .background(MutedPastelGold.copy(alpha = 0.12f), RoundedCornerShape(12.dp))
-                                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .border(1.5.dp, Color(0xFFE0DDD8), RoundedCornerShape(14.dp))
+                                    .background(AppWhite, RoundedCornerShape(14.dp))
+                                    .clickable { toggleFollow() }
+                                    .padding(horizontal = 18.dp, vertical = 9.dp)
                             ) {
-                                Icon(Icons.Filled.Star, contentDescription = null, tint = MutedPastelGold, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                val scoreText =
-                                    if (profile.trustScore > 0) String.format(Locale.US, "%.1f", profile.trustScore) else "—"
-                                Text(scoreText, fontWeight = FontWeight.Bold, color = MutedPastelGold, fontSize = 14.sp)
                                 Text(
-                                    " (trust score)",
-                                    color = MutedPastelGold.copy(alpha = 0.85f),
-                                    fontSize = 12.sp,
-                                    modifier = Modifier.padding(start = 4.dp)
+                                    "Following",
+                                    fontFamily = BodyFontFamily,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp,
+                                    color = AppDark
                                 )
                             }
-
-                            when (profileSurface) {
-                                PublicProfileSurface.PERSONAL -> {
-                                    Spacer(modifier = Modifier.height(20.dp))
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceEvenly
-                                    ) {
-                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                            Text("${userPosts.size}", style = AppTextStyles.Heading2.copy(fontSize = 24.sp))
-                                            Text(
-                                                "RECS",
-                                                style = AppTextStyles.BodySmall,
-                                                color = DarkPastelAnthracite.copy(alpha = 0.45f),
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                        }
-                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                            Text("$followersCount", style = AppTextStyles.Heading2.copy(fontSize = 24.sp))
-                                            Text(
-                                                "FOLLOWERS",
-                                                style = AppTextStyles.BodySmall,
-                                                color = DarkPastelAnthracite.copy(alpha = 0.45f),
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                        }
-                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                            Text("${profile.following.size}", style = AppTextStyles.Heading2.copy(fontSize = 24.sp))
-                                            Text(
-                                                "SUBSCRIPTIONS",
-                                                style = AppTextStyles.BodySmall,
-                                                color = DarkPastelAnthracite.copy(alpha = 0.45f),
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                        }
-                                    }
-
-                                    Spacer(modifier = Modifier.height(16.dp))
-                                    Text(
-                                        profile.bio.ifEmpty { "Hi! I'm on TrustList." },
-                                        style = AppTextStyles.BodyMedium,
-                                        color = DarkPastelAnthracite.copy(alpha = 0.65f),
-                                        textAlign = TextAlign.Center
-                                    )
-
-                                    Spacer(modifier = Modifier.height(20.dp))
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(50.dp)
-                                            .clip(RoundedCornerShape(16.dp))
-                                            .border(
-                                                width = 1.5.dp,
-                                                brush = PrimaryGradient,
-                                                shape = RoundedCornerShape(16.dp)
-                                            )
-                                            .clickable { profileSurfaceOrdinal = 1 },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.Center
-                                        ) {
-                                            Text(
-                                                "View ad campaigns",
-                                                style = AppTextStyles.BodyMedium,
-                                                fontWeight = FontWeight.Bold,
-                                                color = DarkPastelAnthracite
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Icon(
-                                                Icons.AutoMirrored.Filled.ArrowForward,
-                                                contentDescription = null,
-                                                tint = DarkPastelAnthracite,
-                                                modifier = Modifier.size(20.dp)
-                                            )
-                                        }
-                                    }
-                                }
-
-                                PublicProfileSurface.ADS_CAMPAIGNS -> {
-                                    Spacer(modifier = Modifier.height(12.dp))
-                                    Box(modifier = Modifier.fillMaxWidth()) {
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .background(
-                                                    brush = Brush.horizontalGradient(
-                                                        colors = listOf(
-                                                            GradientTop,
-                                                            SurfaceMuted,
-                                                            GradientMid.copy(alpha = 0.85f)
-                                                        )
-                                                    ),
-                                                    shape = RoundedCornerShape(20.dp)
-                                                )
-                                                .padding(16.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Icon(
-                                                Icons.Filled.AccountBalanceWallet,
-                                                contentDescription = null,
-                                                tint = MutedPastelGold,
-                                                modifier = Modifier.size(28.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(12.dp))
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text(
-                                                    "Balance: ${profile.trustCoins}",
-                                                    style = AppTextStyles.BodyMedium,
-                                                    fontWeight = FontWeight.Bold,
-                                                    color = DarkPastelAnthracite
-                                                )
-                                                Text(
-                                                    "TrustCoins",
-                                                    style = AppTextStyles.BodySmall,
-                                                    color = DarkPastelAnthracite.copy(alpha = 0.55f)
-                                                )
-                                            }
-                                        }
-                                    }
-
-                                    Spacer(modifier = Modifier.height(20.dp))
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceEvenly
-                                    ) {
-                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                            Text("${theirOffers.size}", style = AppTextStyles.Heading2.copy(fontSize = 24.sp))
-                                            Text(
-                                                "LAUNCHED",
-                                                style = AppTextStyles.BodySmall,
-                                                color = DarkPastelAnthracite.copy(alpha = 0.45f),
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                        }
-                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                            Text("$promoterCampaignsCount", style = AppTextStyles.Heading2.copy(fontSize = 24.sp))
-                                            Text(
-                                                "AS PROMOTER",
-                                                style = AppTextStyles.BodySmall,
-                                                color = DarkPastelAnthracite.copy(alpha = 0.45f),
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                        }
-                                    }
-
-                                    Spacer(modifier = Modifier.height(20.dp))
-                                    OutlinedButton(
-                                        onClick = { profileSurfaceOrdinal = 0 },
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(50.dp),
-                                        shape = RoundedCornerShape(16.dp),
-                                        border = BorderStroke(1.dp, RichPastelCoral),
-                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = RichPastelCoral)
-                                    ) {
-                                        Icon(Icons.Filled.Person, contentDescription = null, tint = RichPastelCoral, modifier = Modifier.size(20.dp))
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            "Profile",
-                                            style = AppTextStyles.BodyMedium,
-                                            fontWeight = FontWeight.Bold,
-                                            color = RichPastelCoral
-                                        )
-                                    }
-                                }
-                            }
-
-                            if (!isOwnProfile && viewerProfile != null) {
-                                Spacer(modifier = Modifier.height(18.dp))
-                                if (isFollowing) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(50.dp)
-                                            .clip(RoundedCornerShape(16.dp))
-                                            .border(
-                                                width = 1.5.dp,
-                                                brush = PrimaryGradientLinear,
-                                                shape = RoundedCornerShape(16.dp)
-                                            )
-                                            .background(Color.White)
-                                            .clickable { toggleFollow() },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            "Unfollow",
-                                            color = AppDark,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 16.sp
-                                        )
-                                    }
-                                } else {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(50.dp)
-                                            .clip(RoundedCornerShape(16.dp))
-                                            .background(PrimaryGradientLinear)
-                                            .clickable { toggleFollow() },
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            "Follow",
-                                            color = Color.White,
-                                            fontWeight = FontWeight.Bold,
-                                            fontSize = 16.sp
-                                        )
-                                    }
-                                }
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .background(PrimaryGradientLinear)
+                                    .clickable { toggleFollow() }
+                                    .padding(horizontal = 18.dp, vertical = 9.dp)
+                            ) {
+                                Text(
+                                    "Follow",
+                                    fontFamily = BodyFontFamily,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp,
+                                    color = AppWhite
+                                )
                             }
                         }
                     }
                 }
+            }
 
-                when (profileSurface) {
-                    PublicProfileSurface.PERSONAL -> {
-                        personalRecsAndCollectionsSection(
-                            selectedTab = selectedTab,
-                            onSelectedTab = { selectedTab = it },
-                            myPosts = userPosts,
-                            collections = theirCollections,
-                            onPostClick = onPostClick,
-                            onCollectionClick = onCollectionClick,
-                            recsTabLabel = "Recs",
-                            collectionsTabLabel = "Collections"
-                        )
-                    }
+            // Space to clear avatar overlap
+            Spacer(Modifier.height(48.dp))
+        }
 
-                    PublicProfileSurface.ADS_CAMPAIGNS -> {
-                        adsDashboardSection(
-                            myOffers = theirOffers,
-                            isBusiness = profile.isBusiness,
-                            onCreateCampaign = {},
-                            onOfferClick = onOfferClick,
-                            onOfferPauseToggle = {},
-                            isViewerOwner = false
-                        )
+        // ── Name / handle / bio ───────────────────────────────────────────────
+        item {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp)
+                    .padding(bottom = 16.dp)
+            ) {
+                // Авто-уменьшение шрифта при длинном имени, max 2/3 ширины
+                var nameFontSize by remember(profile.name) { mutableStateOf(18.sp) }
+                Text(
+                    text = profile.name.ifBlank { "User" },
+                    fontFamily = HeadingFontFamily,
+                    fontWeight = FontWeight.Black,
+                    fontSize = nameFontSize,
+                    color = AppDark,
+                    maxLines = 1,
+                    overflow = TextOverflow.Clip,
+                    modifier = Modifier.fillMaxWidth(2f / 3f),
+                    onTextLayout = { result ->
+                        if (result.hasVisualOverflow && nameFontSize > 13.sp) {
+                            nameFontSize = (nameFontSize.value * 0.85f).sp
+                        }
                     }
+                )
+                if (profile.handle.isNotBlank()) {
+                    Text(
+                        text = profile.handle,
+                        fontFamily = BodyFontFamily,
+                        fontSize = 13.sp,
+                        color = AppMuted,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
+                val bio = profile.bio.ifBlank { "" }
+                if (bio.isNotBlank()) {
+                    Text(
+                        text = bio,
+                        fontFamily = BodyFontFamily,
+                        fontSize = 14.sp,
+                        color = AppDark.copy(alpha = 0.75f),
+                        lineHeight = 21.sp,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
                 }
             }
         }
+
+        // ── Stats: Picks | Followers | TrustScore ring ────────────────────────
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp)
+                    .padding(bottom = 16.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Picks
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = "${userPosts.size}",
+                        fontFamily = HeadingFontFamily,
+                        fontWeight = FontWeight.Black,
+                        fontSize = 20.sp,
+                        color = AppDark
+                    )
+                    Text(
+                        text = "Picks",
+                        fontFamily = BodyFontFamily,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 12.sp,
+                        color = AppMuted,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .width(1.dp)
+                        .height(32.dp)
+                        .background(SurfaceMuted)
+                )
+
+                // Followers
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = "$followersCount",
+                        fontFamily = HeadingFontFamily,
+                        fontWeight = FontWeight.Black,
+                        fontSize = 20.sp,
+                        color = AppDark
+                    )
+                    Text(
+                        text = "Followers",
+                        fontFamily = BodyFontFamily,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 12.sp,
+                        color = AppMuted,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .width(1.dp)
+                        .height(32.dp)
+                        .background(SurfaceMuted)
+                )
+
+                // TrustScore ring
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    TrustScoreRing(
+                        score = trustScore,
+                        size = 40.dp,
+                        strokeWidth = 3.5.dp
+                    )
+                    Text(
+                        text = "TrustScore",
+                        fontFamily = BodyFontFamily,
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 12.sp,
+                        color = AppMuted,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
+            }
+        }
+
+        // ── Tabs + Picks / Collections / Offers grid ──────────────────────────
+        personalRecsAndCollectionsSection(
+            selectedTab = selectedTab,
+            onSelectedTab = { selectedTab = it },
+            myPosts = userPosts,
+            collections = theirCollections,
+            myOffers = theirOffers,
+            isBusiness = profile.isBusiness,
+            onPostClick = onPostClick,
+            onCollectionClick = onCollectionClick,
+            onCreateCampaign = {},
+            onOfferClick = onOfferClick,
+            onOfferPauseToggle = {},
+            recsTabLabel = "Picks",
+            collectionsTabLabel = "Collections",
+            isViewerOwner = false
+        )
     }
 }

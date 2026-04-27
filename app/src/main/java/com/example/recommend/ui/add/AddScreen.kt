@@ -26,31 +26,22 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.example.recommend.ui.theme.AppTextStyles
-import com.example.recommend.ui.theme.DarkPastelAnthracite
-import com.example.recommend.ui.theme.MutedPastelGold
-import com.example.recommend.ui.theme.MutedPastelTeal
-import com.example.recommend.ui.theme.SoftPastelMint
-import com.example.recommend.ui.theme.SurfaceMuted
 import com.example.recommend.ui.theme.AppDark
-import com.example.recommend.ui.theme.PrimaryGradient
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
 import com.google.firebase.storage.StorageMetadata
 import java.util.concurrent.Executors
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AddScreen(
     onPostAdded: () -> Unit,
@@ -68,7 +59,6 @@ fun AddScreen(
     var location by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var selectedCategory by remember { mutableStateOf("Food") }
-    var rating by remember { mutableStateOf(5) }
     var isUploading by remember { mutableStateOf(false) }
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
 
@@ -76,7 +66,6 @@ fun AddScreen(
     val db = FirebaseFirestore.getInstance()
     val auth = FirebaseAuth.getInstance()
     val storage = FirebaseStorage.getInstance()
-    val scheme = MaterialTheme.colorScheme
 
     val pickImage = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -85,12 +74,7 @@ fun AddScreen(
     val compressExecutor = remember { Executors.newSingleThreadExecutor() }
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
 
-    val categories = listOf(
-        CategoryItem("Service", Icons.Filled.Build, "service"),
-        CategoryItem("Shopping", Icons.Filled.ShoppingCart, "shopping"),
-        CategoryItem("Food", Icons.Filled.Favorite, "food"),
-        CategoryItem("Beauty", Icons.Filled.Face, "beauty")
-    )
+    val categories = listOf("🍜 Food", "☕ Coffee", "🌿 Places", "🎉 Events", "🛍 Shopping", "💅 Beauty", "🔧 Services")
 
     fun writePostDocument(imageUrl: String?) {
         val currentUser = auth.currentUser
@@ -103,18 +87,14 @@ fun AddScreen(
             "description" to description,
             "category" to selectedCategory,
             "location" to location,
-            "rating" to rating,
+            "rating" to 5,
             "authorName" to authorName,
             "authorHandle" to "@${authorName.lowercase()}",
             "createdAt" to System.currentTimeMillis()
         )
-        if (!imageUrl.isNullOrBlank()) {
-            postData["imageUrl"] = imageUrl
-        }
+        if (!imageUrl.isNullOrBlank()) postData["imageUrl"] = imageUrl
         val replyRid = requestId?.trim().orEmpty()
-        if (replyRid.isNotEmpty()) {
-            postData["replyToRequestId"] = replyRid
-        }
+        if (replyRid.isNotEmpty()) postData["replyToRequestId"] = replyRid
         if (isSponsored && !offerId.isNullOrBlank()) {
             postData["isSponsored"] = true
             postData["offerId"] = offerId
@@ -144,8 +124,7 @@ fun AddScreen(
         if (uri != null) {
             compressExecutor.execute {
                 val bytes = ImageCompress.compressUriToJpeg(
-                    context,
-                    uri,
+                    context, uri,
                     ImageCompress.POST_MAX_SIDE_PX,
                     ImageCompress.POST_JPEG_QUALITY
                 )
@@ -163,9 +142,7 @@ fun AddScreen(
                     .addOnSuccessListener {
                         ref.downloadUrl
                             .addOnSuccessListener { download ->
-                                mainHandler.post {
-                                    writePostDocument(download.toString())
-                                }
+                                mainHandler.post { writePostDocument(download.toString()) }
                             }
                             .addOnFailureListener { e ->
                                 mainHandler.post {
@@ -186,284 +163,304 @@ fun AddScreen(
         }
     }
 
-    Scaffold(
-        containerColor = Color.White,
-        topBar = {
+    val canPublish = !isUploading && title.isNotBlank()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(AppBackground)
+            .systemBarsPadding()
+            .imePadding()
+    ) {
+        // ── Top bar ──────────────────────────────────────────────────────
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+                .padding(horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             if (onBack != null) {
-                TopAppBar(
-                    title = {
-                        Text(
-                            "New recommendation",
-                            style = AppTextStyles.BodyMedium,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp,
-                            color = DarkPastelAnthracite
-                        )
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = MutedPastelTeal)
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.White,
-                        titleContentColor = DarkPastelAnthracite,
-                        navigationIconContentColor = MutedPastelTeal
+                IconButton(onClick = onBack, enabled = !isUploading) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = AppDark)
+                }
+            } else {
+                Spacer(Modifier.width(48.dp))
+            }
+            Text(
+                "Add a Pick",
+                modifier = Modifier.weight(1f),
+                textAlign = TextAlign.Center,
+                fontFamily = HeadingFontFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 17.sp,
+                color = AppDark
+            )
+            TextButton(
+                onClick = { savePostToFirebase() },
+                enabled = canPublish
+            ) {
+                if (isUploading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        color = AppViolet,
+                        strokeWidth = 2.dp
                     )
-                )
+                } else {
+                    Text(
+                        "Publish",
+                        fontFamily = BodyFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        color = if (canPublish) AppViolet else AppMuted
+                    )
+                }
             }
         }
-    ) { paddingValues ->
+
+        // ── Content ──────────────────────────────────────────────────────
         LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 16.dp),
-            contentPadding = PaddingValues(top = if (onBack != null) 8.dp else 24.dp, bottom = 100.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp, ),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
-                if (isSponsored && !offerId.isNullOrBlank()) {
-                    item {
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            color = MutedPastelGold.copy(alpha = 0.14f)
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                                verticalArrangement = Arrangement.spacedBy(2.dp)
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Icon(
-                                        Icons.Filled.Stars,
-                                        contentDescription = null,
-                                        tint = MutedPastelGold,
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                    Text(
-                                        text = "Sponsored post · deal accepted",
-                                        style = AppTextStyles.BodySmall,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MutedPastelGold
-                                    )
-                                }
-                                if (!offerTitle.isNullOrBlank()) {
-                                    Text(
-                                        text = offerTitle,
-                                        style = AppTextStyles.BodySmall,
-                                        color = MutedPastelGold.copy(alpha = 0.75f)
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
 
-                if (!requestId.isNullOrBlank()) {
-                    item {
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            color = MutedPastelTeal.copy(alpha = 0.12f)
-                        ) {
-                            Text(
-                                text = "Reply to signal",
-                                style = AppTextStyles.BodySmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = AppDark,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
-                            )
-                        }
-                    }
-                }
-
-                if (onBack == null) {
-                    item {
-                        Text("New recommendation", style = AppTextStyles.Heading2.copy(fontSize = 24.sp))
-                    }
-                }
-
+            // Sponsored banner
+            if (isSponsored && !offerId.isNullOrBlank()) {
                 item {
-                    Card(
-                        shape = RoundedCornerShape(32.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 10.dp)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(AppGold.copy(alpha = 0.08f))
+                            .border(1.dp, AppGold.copy(alpha = 0.25f), RoundedCornerShape(14.dp))
+                            .padding(12.dp, 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column(modifier = Modifier.padding(24.dp)) {
+                        Text("🪙", fontSize = 14.sp)
+                        Column {
+                            Text(
+                                "Sponsored post · deal accepted",
+                                fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                                color = AppGold, fontFamily = BodyFontFamily
+                            )
+                            if (!offerTitle.isNullOrBlank()) {
+                                Text(offerTitle, fontSize = 12.sp, color = AppGold.copy(alpha = 0.75f), fontFamily = BodyFontFamily)
+                            }
+                        }
+                    }
+                }
+            }
 
-                            Text("PHOTO", style = AppTextStyles.BodySmall, color = DarkPastelAnthracite.copy(alpha = 0.45f), letterSpacing = 1.sp)
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Box(
+            // Reply to signal banner
+            if (!requestId.isNullOrBlank()) {
+                item {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(AppViolet.copy(alpha = 0.06f))
+                            .border(1.dp, AppViolet.copy(alpha = 0.2f), RoundedCornerShape(14.dp))
+                            .padding(12.dp, 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("🐺", fontSize = 14.sp)
+                        Text(
+                            "Reply to pack signal",
+                            fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                            color = AppViolet, fontFamily = BodyFontFamily
+                        )
+                    }
+                }
+            }
+
+            // Photo
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    AddFieldLabel("Photo")
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(140.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(SurfaceMuted)
+                            .border(2.dp, Color(0xFFDDD8D0), RoundedCornerShape(16.dp))
+                            .clickable(enabled = !isUploading) {
+                                pickImage.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (selectedImageUri != null) {
+                            AsyncImage(
+                                model = selectedImageUri,
+                                contentDescription = "Selected photo",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                            IconButton(
+                                onClick = { selectedImageUri = null },
                                 modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(160.dp)
-                                    .clip(RoundedCornerShape(24.dp))
-                                    .background(SurfaceMuted)
-                                    .border(2.dp, SurfaceMuted, RoundedCornerShape(24.dp))
-                                    .clickable {
-                                        pickImage.launch(
-                                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                                        )
-                                    },
-                                contentAlignment = Alignment.Center
+                                    .align(Alignment.TopEnd)
+                                    .padding(8.dp)
+                                    .background(Color.Black.copy(alpha = 0.45f), CircleShape)
                             ) {
-                                if (selectedImageUri != null) {
-                                    AsyncImage(
-                                        model = selectedImageUri,
-                                        contentDescription = "Selected photo",
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentScale = ContentScale.Crop
-                                    )
-                                    IconButton(
-                                        onClick = { selectedImageUri = null },
-                                        modifier = Modifier
-                                            .align(Alignment.TopEnd)
-                                            .padding(8.dp)
-                                            .background(Color.Black.copy(alpha = 0.45f), CircleShape)
-                                    ) {
-                                        Icon(Icons.Filled.Close, contentDescription = "Remove photo", tint = Color.White)
-                                    }
-                                } else {
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Icon(
-                                            Icons.Filled.AddPhotoAlternate,
-                                            contentDescription = null,
-                                            tint = MutedPastelTeal,
-                                            modifier = Modifier.size(40.dp)
-                                        )
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                        Text(
-                                            "Tap to add a photo (optional)",
-                                            style = AppTextStyles.BodySmall,
-                                            color = DarkPastelAnthracite.copy(alpha = 0.55f)
-                                        )
-                                    }
-                                }
+                                Icon(Icons.Filled.Close, contentDescription = "Remove photo", tint = Color.White)
                             }
-
-                            Spacer(modifier = Modifier.height(24.dp))
-
-                            Text("PLACE NAME", style = AppTextStyles.BodySmall, color = DarkPastelAnthracite.copy(alpha = 0.45f))
-                            AppTextField(
-                                value = title,
-                                onValueChange = { title = it },
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true
-                            )
-
-                            Spacer(modifier = Modifier.height(24.dp))
-
-                            Text("CATEGORY", style = AppTextStyles.BodySmall, color = DarkPastelAnthracite.copy(alpha = 0.45f))
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    CategoryButton(categories[0], selectedCategory == categories[0].label) { selectedCategory = it }
-                                    CategoryButton(categories[1], selectedCategory == categories[1].label) { selectedCategory = it }
-                                }
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    CategoryButton(categories[2], selectedCategory == categories[2].label) { selectedCategory = it }
-                                    CategoryButton(categories[3], selectedCategory == categories[3].label) { selectedCategory = it }
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(24.dp))
-
-                            Text("WHERE IS IT?", style = AppTextStyles.BodySmall, color = DarkPastelAnthracite.copy(alpha = 0.45f))
-                            AppTextField(
-                                value = location,
-                                onValueChange = { location = it },
-                                leadingIcon = { Icon(Icons.Filled.LocationOn, null, tint = AppTeal) },
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true
-                            )
-
-                            Spacer(modifier = Modifier.height(24.dp))
-
-                            Text("YOUR RATING", style = AppTextStyles.BodySmall, color = DarkPastelAnthracite.copy(alpha = 0.45f))
-                            Row(modifier = Modifier.background(SoftPastelMint, RoundedCornerShape(16.dp)).padding(12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                (1..5).forEach { i ->
-                                    Icon(
-                                        Icons.Filled.Star,
-                                        null,
-                                        tint = if (i <= rating) MutedPastelGold else SurfaceMuted,
-                                        modifier = Modifier.size(36.dp).clickable { rating = i }
-                                    )
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(24.dp))
-
-                            Text("WHY DO YOU RECOMMEND IT?", style = AppTextStyles.BodySmall, color = DarkPastelAnthracite.copy(alpha = 0.45f))
-                            AppTextField(
-                                value = description,
-                                onValueChange = { description = it },
-                                modifier = Modifier.fillMaxWidth().height(120.dp),
-                                singleLine = false
-                            )
-
-                            Spacer(modifier = Modifier.height(32.dp))
-
-                            val canPublish = !isUploading && title.isNotBlank() && description.isNotBlank()
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(56.dp)
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .background(
-                                        brush = if (canPublish)
-                                            PrimaryGradient
-                                        else
-                                            Brush.horizontalGradient(listOf(SurfaceMuted, SurfaceMuted))
-                                    )
-                                    .clickable(enabled = canPublish) { savePostToFirebase() },
-                                contentAlignment = Alignment.Center
+                        } else {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                if (isUploading) CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
-                                else Text(
-                                    "Publish",
-                                    style = AppTextStyles.BodyMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 16.sp,
-                                    color = if (canPublish) Color.White else DarkPastelAnthracite.copy(alpha = 0.45f)
+                                Text("🖼️", fontSize = 28.sp, color = AppDark.copy(alpha = 0.4f))
+                                Text(
+                                    "Tap to add a photo (optional)",
+                                    fontSize = 13.sp,
+                                    color = AppMuted,
+                                    fontFamily = BodyFontFamily
                                 )
                             }
                         }
                     }
                 }
+            }
+
+            // Title
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    AddFieldLabel("Title")
+                    AppTextField(
+                        value = title,
+                        onValueChange = { title = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = "Name of the place or tip",
+                        singleLine = true,
+                        enabled = !isUploading,
+                        containerColor = AppWhite
+                    )
+                }
+            }
+
+            // Category chips
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    AddFieldLabel("Category")
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        categories.forEach { cat ->
+                            val label = cat.substringAfter(" ")
+                            val isSelected = selectedCategory == label
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(32.dp))
+                                    .background(
+                                        if (isSelected) PrimaryGradientLinear
+                                        else androidx.compose.ui.graphics.Brush.linearGradient(listOf(AppWhite, AppWhite))
+                                    )
+                                    .border(
+                                        1.5.dp,
+                                        if (isSelected) Color.Transparent else Color(0xFFE8E6E0),
+                                        RoundedCornerShape(32.dp)
+                                    )
+                                    .clickable { selectedCategory = label }
+                                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    cat,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (isSelected) Color.White else AppDark,
+                                    fontFamily = BodyFontFamily
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Location
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    AddFieldLabel("Location")
+                    AppTextField(
+                        value = location,
+                        onValueChange = { location = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = "City or address",
+                        singleLine = true,
+                        leadingIcon = { Icon(Icons.Filled.LocationOn, null, tint = AppTeal, modifier = Modifier.size(20.dp)) },
+                        enabled = !isUploading,
+                        containerColor = AppWhite
+                    )
+                }
+            }
+
+            // Description
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    AddFieldLabel("Why do you recommend it?")
+                    AppTextField(
+                        value = description,
+                        onValueChange = { description = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = "Share what makes it special…",
+                        singleLine = false,
+                        minLines = 4,
+                        enabled = !isUploading,
+                        containerColor = AppWhite
+                    )
+                }
+            }
+
+            // Publish button
+            item {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                        .clip(RoundedCornerShape(32.dp))
+                        .background(
+                            if (canPublish) PrimaryGradientLinear
+                            else DisabledGradient
+                        )
+                        .clickable(enabled = canPublish) { savePostToFirebase() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isUploading) {
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                    } else {
+                        Text(
+                            "Publish Pick",
+                            fontFamily = BodyFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp,
+                            color = if (canPublish) Color.White else AppOnDisabled
+                        )
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+            }
         }
     }
 }
 
-data class CategoryItem(val label: String, val icon: ImageVector, val id: String)
+// ── Shared helpers ────────────────────────────────────────────────────────────
 
 @Composable
-fun RowScope.CategoryButton(item: CategoryItem, isSelected: Boolean, onClick: (String) -> Unit) {
-    Button(
-        onClick = { onClick(item.label) },
-        modifier = Modifier
-            .weight(1f)
-            .height(50.dp)
-            .then(
-                if (isSelected) Modifier.background(
-                    brush = PrimaryGradient,
-                    shape = RoundedCornerShape(16.dp)
-                ) else Modifier
-            ),
-        shape = RoundedCornerShape(16.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = if (isSelected) Color.Transparent else SurfaceMuted,
-            contentColor = if (isSelected) Color.White else DarkPastelAnthracite
-        )
-    ) {
-        Icon(item.icon, contentDescription = null, tint = if (isSelected) Color.White else MutedPastelTeal, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(8.dp))
-        Text(
-            item.label,
-            fontWeight = FontWeight.Bold,
-            fontSize = 14.sp,
-            color = if (isSelected) Color.White else DarkPastelAnthracite
-        )
-    }
+fun AddFieldLabel(text: String) {
+    Text(
+        text = text.uppercase(),
+        fontSize = 11.sp,
+        fontWeight = FontWeight.Bold,
+        letterSpacing = 0.6.sp,
+        color = AppMuted,
+        fontFamily = BodyFontFamily
+    )
 }
+
+// Legacy — kept for source compatibility, not used in UI
+data class CategoryItem(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector, val id: String)

@@ -3,6 +3,7 @@ package com.example.recommend.data.repository
 import com.example.recommend.data.model.Post
 import com.example.recommend.data.model.toPostFromDoc
 import com.example.recommend.trustListDataRoot
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import kotlinx.coroutines.channels.awaitClose
@@ -24,6 +25,15 @@ class PostRepository(private val db: FirebaseFirestore) {
                 }
             }
         awaitClose { listener.remove() }
+    }
+
+    fun toggleLike(postId: String, uid: String, currentlyLiked: Boolean) {
+        val ref = db.trustListDataRoot().collection("posts").document(postId)
+        if (currentlyLiked) {
+            ref.update("likesByUser", FieldValue.arrayRemove(uid))
+        } else {
+            ref.update("likesByUser", FieldValue.arrayUnion(uid))
+        }
     }
 
     suspend fun addPost(post: Post) {

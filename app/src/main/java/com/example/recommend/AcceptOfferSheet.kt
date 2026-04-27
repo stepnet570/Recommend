@@ -1,31 +1,25 @@
 package com.example.recommend
 
-import androidx.compose.foundation.border
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Group
-import androidx.compose.material.icons.filled.Stars
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.recommend.data.AcceptOfferResult
 import com.example.recommend.data.acceptOffer
 import com.example.recommend.data.model.AdOffer
-import com.example.recommend.ui.theme.AppTextStyles
-import com.example.recommend.ui.theme.DarkPastelAnthracite
-import com.example.recommend.ui.theme.MutedPastelGold
-import com.example.recommend.ui.theme.MutedPastelTeal
-import com.example.recommend.ui.theme.RichPastelCoral
-import com.example.recommend.ui.theme.SoftPastelMint
+import com.example.recommend.ui.theme.*
 import com.google.firebase.firestore.FirebaseFirestore
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -43,120 +37,247 @@ fun AcceptOfferSheet(
     val db = FirebaseFirestore.getInstance()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
-    val daysLeft = remember(offer.expiresAt) {
-        if (offer.expiresAt <= 0L) null
-        else ((offer.expiresAt - System.currentTimeMillis()) / 86_400_000L)
-            .toInt().coerceAtLeast(0)
+    // Deadline text: prefer computed days-left, fall back to durationDays
+    val deadlineText = remember(offer.expiresAt, offer.durationDays) {
+        when {
+            offer.expiresAt > 0L -> {
+                val daysLeft = ((offer.expiresAt - System.currentTimeMillis()) / 86_400_000L)
+                    .toInt().coerceAtLeast(0)
+                "$daysLeft days left"
+            }
+            offer.durationDays > 0 -> "${offer.durationDays} days"
+            else -> "Flexible"
+        }
     }
+
+    // Brand initial (first letter of business name)
+    val brandInitial = offer.businessName.firstOrNull()?.uppercase() ?: "B"
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = Color.White,
-        dragHandle = { BottomSheetDefaults.DragHandle() }
+        dragHandle = {
+            // Custom handle matching design
+            Box(
+                modifier = Modifier
+                    .padding(top = 12.dp, bottom = 8.dp)
+                    .width(40.dp)
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(SurfaceMuted)
+            )
+        }
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp)
-                .padding(bottom = 32.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(bottom = 40.dp),
+            horizontalAlignment = Alignment.Start
         ) {
-            // Header
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Spacer(Modifier.height(8.dp))
+
+            // ── Brand box ─────────────────────────────────────────────────
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(PrimaryGradientLinear),
+                contentAlignment = Alignment.Center
+            ) {
                 Text(
-                    text = offer.title,
-                    style = AppTextStyles.Heading2.copy(fontSize = 20.sp),
-                    color = DarkPastelAnthracite
-                )
-                Text(
-                    text = offer.businessName,
-                    style = AppTextStyles.BodySmall,
-                    color = DarkPastelAnthracite.copy(alpha = 0.55f)
+                    text = brandInitial,
+                    fontFamily = HeadingFontFamily,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 28.sp,
+                    color = Color.White
                 )
             }
 
-            // Description
+            Spacer(Modifier.height(14.dp))
+
+            // ── "Exclusive Offer" gold pill ───────────────────────────────
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(32.dp))
+                    .background(AppGold.copy(alpha = 0.12f))
+                    .padding(horizontal = 12.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = "✦ Exclusive Offer",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = AppGold,
+                    fontFamily = BodyFontFamily
+                )
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            // ── Offer title ───────────────────────────────────────────────
             Text(
-                text = offer.description,
-                style = AppTextStyles.BodyMedium,
-                color = DarkPastelAnthracite.copy(alpha = 0.85f)
+                text = offer.title,
+                fontFamily = HeadingFontFamily,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 20.sp,
+                color = AppDark
             )
 
-            // Stats chips
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OfferStatChip(
-                    icon = Icons.Filled.Stars,
-                    label = "+${offer.rewardCoins} TC",
-                    color = MutedPastelGold
-                )
-                OfferStatChip(
-                    icon = Icons.Filled.Group,
-                    label = "${offer.slotsLeft} slots left",
-                    color = MutedPastelTeal
-                )
-                if (daysLeft != null) {
-                    OfferStatChip(
-                        icon = Icons.Filled.CalendarMonth,
-                        label = "${daysLeft}d left",
-                        color = RichPastelCoral
+            // ── Description ───────────────────────────────────────────────
+            Text(
+                text = offer.description,
+                fontSize = 14.sp,
+                color = AppMuted,
+                fontFamily = BodyFontFamily,
+                lineHeight = 20.sp,
+                modifier = Modifier.padding(top = 6.dp, bottom = 20.dp)
+            )
+
+            // ── Reward card (gold tinted) ─────────────────────────────────
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(AppGold.copy(alpha = 0.08f))
+                    .then(
+                        Modifier.let {
+                            // subtle gold border via padding trick — use Surface instead
+                            it
+                        }
+                    )
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text("🪙", fontSize = 28.sp)
+                Column {
+                    Text(
+                        text = "Reward for this pick",
+                        fontSize = 13.sp,
+                        color = AppMuted,
+                        fontFamily = BodyFontFamily
+                    )
+                    Text(
+                        text = "${offer.rewardCoins} TrustCoins",
+                        fontFamily = HeadingFontFamily,
+                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 22.sp,
+                        color = AppGold
                     )
                 }
             }
 
-            // Hint
-            Text(
-                text = "After accepting, you'll create a sponsored post to complete this deal.",
-                style = AppTextStyles.BodySmall,
-                color = DarkPastelAnthracite.copy(alpha = 0.5f)
-            )
+            Spacer(Modifier.height(12.dp))
 
-            // Error
+            // ── Requirements card (SurfaceMuted) ──────────────────────────
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(SurfaceMuted)
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Minimum TrustScore",
+                        fontSize = 13.sp,
+                        color = AppMuted,
+                        fontFamily = BodyFontFamily
+                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = offer.minTrustScore.let {
+                                if (it == it.toLong().toDouble()) it.toLong().toString()
+                                else String.format("%.1f", it)
+                            },
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = AppDark,
+                            fontFamily = BodyFontFamily
+                        )
+                        Text("✓", fontSize = 14.sp, color = AppTeal, fontWeight = FontWeight.Bold)
+                    }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Deadline",
+                        fontSize = 13.sp,
+                        color = AppMuted,
+                        fontFamily = BodyFontFamily
+                    )
+                    Text(
+                        text = deadlineText,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = AppDark,
+                        fontFamily = BodyFontFamily
+                    )
+                }
+            }
+
+            // ── Error message ─────────────────────────────────────────────
             if (errorMessage != null) {
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = RichPastelCoral.copy(alpha = 0.12f)
+                Spacer(Modifier.height(12.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(AppError.copy(alpha = 0.1f))
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
                     Text(
                         text = errorMessage!!,
                         style = AppTextStyles.BodySmall,
-                        color = RichPastelCoral,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                        color = AppError,
+                        fontFamily = BodyFontFamily
                     )
                 }
             }
 
-            // Accept button or accepted state
+            Spacer(Modifier.height(20.dp))
+
+            // ── Accept button / accepted state ────────────────────────────
             if (isAccepted) {
-                Surface(
-                    color = MutedPastelTeal.copy(alpha = 0.10f),
-                    shape = RoundedCornerShape(16.dp)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(AppTeal.copy(alpha = 0.10f))
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            Icons.Filled.CheckCircle,
-                            contentDescription = null,
-                            tint = MutedPastelTeal
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            text = "You've completed this deal",
-                            color = MutedPastelTeal,
-                            fontWeight = FontWeight.Bold,
-                            style = AppTextStyles.BodyMedium
-                        )
-                    }
+                    Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = AppTeal)
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "You've completed this deal",
+                        color = AppTeal,
+                        fontWeight = FontWeight.Bold,
+                        style = AppTextStyles.BodyMedium
+                    )
                 }
             } else {
-                Button(
-                    onClick = {
-                        if (!isLoading) {
+                // Gradient "Accept offer" button
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(54.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(if (!isLoading) PrimaryGradientLinear else DisabledGradient)
+                        .clickable(enabled = !isLoading) {
                             isLoading = true
                             errorMessage = null
                             acceptOffer(db, offer, viewerUid) { result ->
@@ -167,28 +288,17 @@ fun AcceptOfferSheet(
                                     is AcceptOfferResult.AlreadyAccepted ->
                                         errorMessage = "You've already accepted this offer."
                                     is AcceptOfferResult.OfferFull ->
-                                        errorMessage = "Sorry, all slots for this offer are taken."
+                                        errorMessage = "All slots for this offer are taken."
                                     is AcceptOfferResult.OfferExpired ->
                                         errorMessage = "This offer has expired."
                                     is AcceptOfferResult.NotEnoughCoins ->
-                                        errorMessage = "Business has insufficient TrustCoins for this reward."
+                                        errorMessage = "Business has insufficient TrustCoins."
                                     is AcceptOfferResult.Error ->
                                         errorMessage = result.message
                                 }
                             }
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(54.dp),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MutedPastelGold,
-                        contentColor = Color.White,
-                        disabledContainerColor = MutedPastelGold.copy(alpha = 0.5f),
-                        disabledContentColor = Color.White.copy(alpha = 0.7f)
-                    ),
-                    enabled = !isLoading
+                        },
+                    contentAlignment = Alignment.Center
                 ) {
                     if (isLoading) {
                         CircularProgressIndicator(
@@ -198,47 +308,26 @@ fun AcceptOfferSheet(
                         )
                     } else {
                         Text(
-                            text = "Accept deal · +${offer.rewardCoins} coins",
-                            style = AppTextStyles.BodyMedium,
+                            text = "Accept offer",
+                            fontFamily = BodyFontFamily,
                             fontWeight = FontWeight.Bold,
                             fontSize = 16.sp,
                             color = Color.White
                         )
                     }
                 }
-            }
-        }
-    }
-}
 
-@Composable
-private fun OfferStatChip(
-    icon: ImageVector,
-    label: String,
-    color: Color
-) {
-    Surface(
-        shape = RoundedCornerShape(20.dp),
-        color = color.copy(alpha = 0.12f),
-        modifier = Modifier.border(1.dp, color.copy(alpha = 0.3f), RoundedCornerShape(20.dp))
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = color,
-                modifier = Modifier.size(14.dp)
-            )
-            Text(
-                text = label,
-                style = AppTextStyles.BodySmall,
-                fontWeight = FontWeight.SemiBold,
-                color = color
-            )
+                Spacer(Modifier.height(12.dp))
+
+                Text(
+                    text = "You keep 100% of coins",
+                    fontSize = 13.sp,
+                    color = AppMuted,
+                    fontFamily = BodyFontFamily,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
     }
 }

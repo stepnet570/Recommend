@@ -138,9 +138,9 @@ fun TrustScoreRing(
             verticalArrangement = Arrangement.Center
         ) {
             Text(
-                text = if (score <= 0f) "—" else String.format("%.1f", score),
+                text = if (score <= 0f) "—" else if (score % 1f == 0f) score.toInt().toString() else String.format("%.1f", score),
                 fontFamily = HeadingFontFamily,
-                fontWeight = FontWeight.Bold,
+                fontWeight = FontWeight.ExtraBold,  // wght=800, matches HTML SVG font-weight="800"
                 fontSize = (size.value * 0.26f).sp,
                 color = AppDark,
                 maxLines = 1
@@ -1264,6 +1264,46 @@ private fun PackAskEmptyCard(onAskPackClick: () -> Unit) {
     }
 }
 
+// ─── Category → emoji + gradient ─────────────────────────────────────────────
+
+data class CategoryStyle(val emoji: String, val gradient: Brush)
+
+fun categoryStyle(category: String): CategoryStyle {
+    val c = category.trim().lowercase()
+    return when {
+        c.contains("coffee") || c.contains("кофе") -> CategoryStyle(
+            emoji = "☕",
+            gradient = Brush.linearGradient(
+                listOf(Color(0xFFF5E6D3), Color(0xFFEDD5B3)),
+                start = Offset(0f, 0f), end = Offset(500f, 500f)
+            )
+        )
+        c.contains("food") || c.contains("еда") || c.contains("ramen") || c.contains("рест") -> CategoryStyle(
+            emoji = "🍜",
+            gradient = Brush.linearGradient(
+                listOf(Color(0xFFE8F5E9), Color(0xFFC8E6C9)),
+                start = Offset(0f, 0f), end = Offset(500f, 500f)
+            )
+        )
+        c.contains("place") || c.contains("bar") || c.contains("бар") || c.contains("resto") -> CategoryStyle(
+            emoji = "🗺️",
+            gradient = Brush.linearGradient(
+                listOf(Color(0xFFE3F2FD), Color(0xFFBBDEFB)),
+                start = Offset(0f, 0f), end = Offset(500f, 500f)
+            )
+        )
+        else -> CategoryStyle(
+            emoji = "⭐",
+            gradient = Brush.linearGradient(
+                listOf(AppViolet.copy(alpha = 0.12f), AppTeal.copy(alpha = 0.12f)),
+                start = Offset(0f, 0f), end = Offset(500f, 500f)
+            )
+        )
+    }
+}
+
+// ─── FeedPostCard — точно по HTML .post-card ─────────────────────────────────
+
 @Composable
 fun FeedPostCard(
     post: Post,
@@ -1276,240 +1316,355 @@ fun FeedPostCard(
     onOpenPost: ((String) -> Unit)? = null
 ) {
     val authorUser = users.find { it.uid == post.userId }
-    val iconTint = MutedPastelTeal
-    val isOwnPost = post.userId.isNotBlank() && viewerUid != null && post.userId == viewerUid
-    val canRateOthers = viewerUid != null && !isOwnPost
-    val myAudienceStars = viewerUid?.let { post.ratingsByUser[it] } ?: 0
-    val audienceAvgRounded = post.averageAudienceRatingStars()
-    val cardBorder = if (post.isSponsored) {
-        Modifier.border(2.dp, MutedPastelGold, RoundedCornerShape(28.dp))
-    } else Modifier
+    val authorName = post.authorName.ifBlank { authorUser?.name.orEmpty().ifBlank { "Pack member" } }
+    val isOwnPost = viewerUid != null && post.userId == viewerUid
+    val myRating = viewerUid?.let { post.ratingsByUser[it] } ?: 0
+    var showRatingDialog by remember { mutableStateOf(false) }
 
-    val openPostModifier = if (onOpenPost != null) {
-        Modifier.clickable { onOpenPost(post.id) }
-    } else Modifier
+    val trustScore = remember(post.ratingsByUser) {
+        if (post.ratingsByUser.isEmpty()) 0f
+        else ((post.averageAudienceRatingStars() ?: 0) * 2).toFloat()
+    }.coerceIn(0f, 10f)
 
-    Column(modifier = Modifier.fillMaxWidth()) {
-        ConvexCardBox(
-            modifier = Modifier
-                .fillMaxWidth()
-                .then(cardBorder),
-            shape = RoundedCornerShape(28.dp),
-            elevation = 18.dp
-        ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            if (!post.imageUrl.isNullOrBlank()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(220.dp)
-                        .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-                        .then(openPostModifier)
-                ) {
+    val catStyle = remember(post.category) { categoryStyle(post.category) }
+
+    // post-card: white, radius 20dp, shadow, thin border
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = AppWhite,
+        shadowElevation = 2.dp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .border(1.dp, Color.Black.copy(alpha = 0.04f), RoundedCornerShape(20.dp))
+            .then(if (onOpenPost != null) Modifier.clickable { onOpenPost(post.id) } else Modifier)
+    ) {
+        Column {
+
+            // ── post-img: 160dp, gradient or real image ───────────────────────
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(160.dp)
+                    .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+            ) {
+                if (!post.imageUrl.isNullOrBlank()) {
                     AsyncImage(
                         model = post.imageUrl,
                         contentDescription = null,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop,
-                        placeholder = ColorPainter(SoftPastelMint),
-                        error = ColorPainter(SoftPastelMint)
+                        placeholder = ColorPainter(SurfaceMuted),
+                        error = ColorPainter(SurfaceMuted)
                     )
-                    if (post.isSponsored) {
-                        Surface(
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(8.dp),
-                            shape = RoundedCornerShape(8.dp),
-                            color = MutedPastelGold.copy(alpha = 0.15f)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(Icons.Filled.Stars, null, tint = MutedPastelGold, modifier = Modifier.size(12.dp))
-                                Spacer(Modifier.width(4.dp))
-                                Text(
-                                    "Sponsored",
-                                    style = AppTextStyles.BodySmall,
-                                    color = MutedPastelGold,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
+                } else {
+                    // Gradient placeholder with category emoji
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(catStyle.gradient),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(catStyle.emoji, fontSize = 52.sp)
                     }
                 }
-            }
 
-            Box(modifier = Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 14.dp)
-                    .then(if (post.imageUrl.isNullOrBlank()) openPostModifier else Modifier),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .background(AppViolet.copy(alpha = 0.09f), RoundedCornerShape(8.dp))
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                ) {
-                    Text(
-                        post.category.uppercase(),
-                        style = AppTextStyles.BodySmall,
-                        fontWeight = FontWeight.Bold,
-                        color = AppViolet
-                    )
-                }
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(enabled = post.userId.isNotBlank()) { onUserProfileClick(post.userId) },
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    FeedUserAvatar(
-                        imageUrl = authorUser?.avatar,
-                        displayName = post.authorName.ifBlank { authorUser?.name.orEmpty() },
-                        fallbackSeed = post.userId,
-                        size = 40.dp
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        post.authorName,
-                        style = AppTextStyles.BodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = DarkPastelAnthracite,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-
-                Text(
-                    post.title,
-                    style = AppTextStyles.Heading2.copy(fontSize = 20.sp),
-                    color = DarkPastelAnthracite,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = openPostModifier
-                )
-
-                Text(
-                    post.description,
-                    style = AppTextStyles.BodyMedium,
-                    color = DarkPastelAnthracite.copy(alpha = 0.85f),
-                    lineHeight = 22.sp,
-                    maxLines = 4,
-                    overflow = TextOverflow.Ellipsis
-                )
-                post.resourceUrl?.takeIf { it.isNotBlank() }?.let { url ->
-                    Spacer(modifier = Modifier.height(10.dp))
-                    PostLinkPreviewCard(url)
-                }
-            }
-            if (post.isSponsored && post.imageUrl.isNullOrBlank()) {
-                Surface(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(8.dp),
-                    shape = RoundedCornerShape(8.dp),
-                    color = MutedPastelGold.copy(alpha = 0.15f)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                // sponsored-badge
+                if (post.isSponsored) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(10.dp)
+                            .background(AppGold, RoundedCornerShape(6.dp))
+                            .padding(horizontal = 8.dp, vertical = 3.dp)
                     ) {
-                        Icon(Icons.Filled.Stars, null, tint = MutedPastelGold, modifier = Modifier.size(12.dp))
-                        Spacer(Modifier.width(4.dp))
                         Text(
-                            "Sponsored",
-                            style = AppTextStyles.BodySmall,
-                            color = MutedPastelGold,
-                            fontWeight = FontWeight.Bold
+                            text = "Sponsored",
+                            fontFamily = BodyFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 10.sp,
+                            color = AppWhite
                         )
                     }
                 }
             }
-            } // end content Box
 
-            // Trust Score row — replaces star rating
-            Row(
+            // ── post-body ─────────────────────────────────────────────────────
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(horizontal = 16.dp, vertical = 14.dp)
             ) {
-                Column {
+                // loc-tag: "📍 location"
+                if (post.location.isNotBlank()) {
                     Text(
-                        "Trust Score",
-                        style = AppTextStyles.BodySmall,
-                        color = DarkPastelAnthracite.copy(alpha = 0.45f),
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        audienceAverageRatingLabel(post.ratingsByUser.size),
-                        style = AppTextStyles.BodySmall,
-                        color = DarkPastelAnthracite.copy(alpha = 0.35f)
+                        text = "📍 ${post.location}",
+                        fontFamily = BodyFontFamily,
+                        fontSize = 11.sp,
+                        color = AppMuted,
+                        modifier = Modifier.padding(bottom = 6.dp)
                     )
                 }
-                val trustScore = if (post.ratingsByUser.isEmpty()) {
-                    post.rating * 2f
-                } else {
-                    (audienceAvgRounded ?: post.rating) * 2f
-                }
-                TrustScoreRing(
-                    score = trustScore.coerceIn(0f, 10f),
-                    size = 52.dp,
-                    strokeWidth = 4.dp
-                )
-            }
 
-            Column(modifier = Modifier.padding(16.dp)) {
-                HorizontalDivider(color = SurfaceMuted)
-                Spacer(modifier = Modifier.height(12.dp))
+                // post-header: [pill + title] | [TrustScoreRing]
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    if (canRateOthers) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                "Your rating",
-                                style = AppTextStyles.BodySmall,
-                                color = DarkPastelAnthracite.copy(alpha = 0.45f),
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            YourTrustScorePicker(
-                                myStars = myAudienceStars,
-                                onPickStar = { star -> onAudienceRate(post.id, star) }
-                            )
+                    Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                        // pill-violet: category
+                        if (post.category.isNotBlank()) {
+                            Box(
+                                modifier = Modifier
+                                    .background(AppViolet.copy(alpha = 0.10f), RoundedCornerShape(20.dp))
+                                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = "${catStyle.emoji} ${post.category}",
+                                    fontFamily = BodyFontFamily,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 12.sp,
+                                    color = AppViolet
+                                )
+                            }
+                            Spacer(Modifier.height(6.dp))
                         }
-                    } else {
-                        Spacer(modifier = Modifier.weight(1f))
+                        // post-title: Syne 15/700
+                        Text(
+                            text = post.title,
+                            fontFamily = HeadingFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp,
+                            color = AppDark,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            lineHeight = 20.sp
+                        )
                     }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = { onSaveClick(post.id) }) {
-                            Icon(
-                                if (isSaved) Icons.Filled.Bookmark else Icons.Outlined.BookmarkBorder,
-                                contentDescription = null,
-                                tint = iconTint,
-                                modifier = Modifier.size(22.dp)
+                    // TrustScoreRing — кликабельный, открывает рейтинг
+                    Box(
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .clickable(enabled = !isOwnPost && viewerUid != null) {
+                                showRatingDialog = true
+                            }
+                    ) {
+                        TrustScoreRing(
+                            score = trustScore,
+                            size = 44.dp,
+                            strokeWidth = 3.5.dp
+                        )
+                    }
+                }
+
+                // post-desc
+                if (post.description.isNotBlank()) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = post.description,
+                        fontFamily = BodyFontFamily,
+                        fontSize = 13.sp,
+                        color = AppMuted,
+                        lineHeight = 19.5.sp,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                // Link preview (kept from original)
+                post.resourceUrl?.takeIf { it.isNotBlank() }?.let { url ->
+                    Spacer(Modifier.height(8.dp))
+                    PostLinkPreviewCard(url)
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                // post-footer: author-row | actions
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    // author-row
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable(enabled = post.userId.isNotBlank()) {
+                            onUserProfileClick(post.userId)
+                        }
+                    ) {
+                        // av: 28dp gradient circle with initial
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .background(
+                                    Brush.linearGradient(listOf(AppViolet, AppTeal)),
+                                    CircleShape
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = authorName.take(1).uppercase(),
+                                fontFamily = BodyFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp,
+                                color = AppWhite
                             )
                         }
-                        IconButton(onClick = { /* Share */ }) {
-                            Icon(Icons.Filled.Share, contentDescription = null, tint = iconTint, modifier = Modifier.size(22.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = authorName,
+                                fontFamily = BodyFontFamily,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 12.sp,
+                                color = AppDark,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = "Pack member",
+                                fontFamily = BodyFontFamily,
+                                fontSize = 11.sp,
+                                color = AppMuted
+                            )
                         }
+                    }
+
+                    // Подсказка: нажми на кольцо чтобы оценить
+                    if (!isOwnPost && viewerUid != null) {
+                        Text(
+                            text = if (myRating > 0) "★".repeat(myRating) + "☆".repeat(5 - myRating)
+                                   else "Rate ↑",
+                            fontFamily = BodyFontFamily,
+                            fontSize = 12.sp,
+                            color = if (myRating > 0) AppGold else AppMuted,
+                            modifier = Modifier.clickable { showRatingDialog = true }
+                        )
                     }
                 }
             }
         }
     }
+
+    // ── Rating dialog ──────────────────────────────────────────────────────────
+    if (showRatingDialog) {
+        RatingDialog(
+            postTitle = post.title,
+            currentRating = myRating,
+            onDismiss = { showRatingDialog = false },
+            onRate = { stars ->
+                onAudienceRate(post.id, stars)
+                showRatingDialog = false
+            }
+        )
     }
 }
 
+// ─── RatingDialog ─────────────────────────────────────────────────────────────
+
+@Composable
+fun RatingDialog(
+    postTitle: String,
+    currentRating: Int,
+    onDismiss: () -> Unit,
+    onRate: (Int) -> Unit
+) {
+    var selected by remember { mutableIntStateOf(currentRating) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = AppWhite,
+        shape = RoundedCornerShape(24.dp),
+        title = {
+            Text(
+                text = "Rate this pick",
+                fontFamily = HeadingFontFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp,
+                color = AppDark
+            )
+        },
+        text = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = postTitle,
+                    fontFamily = BodyFontFamily,
+                    fontSize = 13.sp,
+                    color = AppMuted,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(bottom = 20.dp)
+                )
+                // 5 звёзд
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    (1..5).forEach { star ->
+                        Text(
+                            text = if (star <= selected) "★" else "☆",
+                            fontSize = 36.sp,
+                            color = if (star <= selected) AppGold else AppMuted.copy(alpha = 0.4f),
+                            modifier = Modifier.clickable { selected = star }
+                        )
+                    }
+                }
+                if (selected > 0) {
+                    Text(
+                        text = when (selected) {
+                            1 -> "Not worth it"
+                            2 -> "Below average"
+                            3 -> "Decent"
+                            4 -> "Really good"
+                            5 -> "Must try!"
+                            else -> ""
+                        },
+                        fontFamily = BodyFontFamily,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 13.sp,
+                        color = AppViolet,
+                        modifier = Modifier.padding(top = 12.dp)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                    .height(48.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(
+                        if (selected > 0) PrimaryGradientLinear
+                        else Brush.horizontalGradient(listOf(AppDisabled, AppDisabled))
+                    )
+                    .clickable(enabled = selected > 0) { onRate(selected) },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Confirm rating",
+                    fontFamily = BodyFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    color = if (selected > 0) AppWhite else AppOnDisabled
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(
+                    "Cancel",
+                    fontFamily = BodyFontFamily,
+                    fontSize = 14.sp,
+                    color = AppMuted
+                )
+            }
+        }
+    )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 /**
  * Rich link row: favicon (via Google s2), host / Maps title, snippet; tap opens via [openExternalUrl] (Maps app for short links).
  */
@@ -1781,9 +1936,9 @@ fun PostCard(
                     )
                 }
                 val trustScore2 = if (post.ratingsByUser.isEmpty()) {
-                    post.rating * 2f
+                    0f
                 } else {
-                    (audienceAvgRounded ?: post.rating) * 2f
+                    ((audienceAvgRounded ?: 0) * 2).toFloat()
                 }
                 TrustScoreRing(
                     score = trustScore2.coerceIn(0f, 10f),

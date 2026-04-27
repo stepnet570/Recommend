@@ -3,6 +3,7 @@ package com.example.recommend
 import com.example.recommend.data.model.*
 import com.example.recommend.ui.theme.*
 
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
@@ -36,20 +37,23 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.recommend.ui.theme.AppTextStyles
-import com.example.recommend.ui.theme.ConvexCardBox
-import com.example.recommend.ui.theme.DarkPastelAnthracite
-import com.example.recommend.ui.theme.MutedPastelTeal
+import com.example.recommend.ui.theme.AppDark
+import com.example.recommend.ui.theme.AppTeal
 import com.example.recommend.ui.theme.SurfaceMuted
 import com.example.recommend.ui.theme.PrimaryGradientLinear
 import com.example.recommend.ui.theme.DisabledGradient
 import com.example.recommend.ui.theme.AppOnDisabled
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 @OptIn(ExperimentalAnimationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun AskPackScreen(
     onDismiss: () -> Unit,
+    /** Called on successful creation — use to navigate to the feed. Falls back to onDismiss. */
+    onCreated: () -> Unit = onDismiss,
     users: List<UserProfile>,
     currentUserProfile: UserProfile?
 ) {
@@ -57,57 +61,87 @@ fun AskPackScreen(
 
     var step by remember { mutableStateOf(1) }
     var text by remember { mutableStateOf("") }
+    var location by remember { mutableStateOf("") }
     var selectedTags by remember { mutableStateOf(setOf<String>()) }
     var selectedUsers by remember { mutableStateOf(setOf<String>()) }
     var isSubmitting by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val context = LocalContext.current
     val db = FirebaseFirestore.getInstance()
     val auth = FirebaseAuth.getInstance()
+    val scope = rememberCoroutineScope()
+
+    // Always use the latest references — safe across recompositions
+    val currentOnDismiss by rememberUpdatedState(onDismiss)
+    val currentOnCreated by rememberUpdatedState(onCreated)
 
     val availableTags = listOf("🍔 Eat", "🍷 Drink", "🆘 Urgent", "📅 Date", "🔧 Services", "🎉 Party")
 
     val packUsers = users.filter { currentUserProfile?.following?.contains(it.uid) == true }
 
-    LaunchedEffect(Unit) {
-        selectedUsers = packUsers.map { it.uid }.toSet()
+    // Re-run when packUsers loads (in case users arrive after initial composition)
+    LaunchedEffect(packUsers.size) {
+        if (selectedUsers.isEmpty() && packUsers.isNotEmpty()) {
+            selectedUsers = packUsers.map { it.uid }.toSet()
+        }
     }
 
-    fun submitRequest() {
-        val currentUser = auth.currentUser ?: return
+    // Submits the Pack Call via coroutine — avoids stale closure / Handler threading issues
+    fun submit() {
+        val currentUser = auth.currentUser ?: run {
+            Toast.makeText(context, "Not signed in", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (text.isBlank()) {
+            Toast.makeText(context, "Enter your question first", Toast.LENGTH_SHORT).show()
+            return
+        }
         if (selectedUsers.isEmpty()) {
             Toast.makeText(context, "Select at least one friend", Toast.LENGTH_SHORT).show()
             return
         }
 
-        isSubmitting = true
-        val requestData = hashMapOf(
+        val authorName = currentUserProfile?.name?.takeIf { it.isNotBlank() }
+            ?: currentUser.email?.substringBefore("@")?.replaceFirstChar { it.uppercase() } ?: "Anonymous"
+
+        val requestData = hashMapOf<String, Any>(
             "userId" to currentUser.uid,
-            "text" to text,
+            "authorName" to authorName,
+            "text" to text.trim(),
             "tags" to selectedTags.toList(),
-            "location" to "Current area",
+            "location" to location.trim().ifBlank { "Current area" },
             "selectedUsers" to selectedUsers.toList(),
             "status" to "active",
             "createdAt" to System.currentTimeMillis()
         )
 
-        db.trustListDataRoot()
-            .collection("requests")
-            .add(requestData)
-            .addOnSuccessListener {
+        Log.d("AskPack", "Submitting request: text=${text.trim()}, users=${selectedUsers.size}")
+
+        scope.launch {
+            isSubmitting = true
+            errorMessage = null
+            try {
+                val ref = db.trustListDataRoot()
+                    .collection("requests")
+                    .add(requestData)
+                    .await()
+                Log.d("AskPack", "Request created: ${ref.id}")
+                Toast.makeText(context, "Signal sent to your pack! 🐺", Toast.LENGTH_SHORT).show()
+                currentOnCreated()
+            } catch (e: Exception) {
+                Log.e("AskPack", "Firestore error: ${e.message}", e)
                 isSubmitting = false
-                Toast.makeText(context, "Signal sent to your pack!", Toast.LENGTH_SHORT).show()
-                onDismiss()
+                val msg = e.message ?: "Failed to send"
+                errorMessage = msg
+                Toast.makeText(context, "Error: $msg", Toast.LENGTH_LONG).show()
             }
-            .addOnFailureListener { e ->
-                isSubmitting = false
-                Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
-            }
+        }
     }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = Color.White
+        color = AppBackground
     ) {
         Column(
             modifier = Modifier
@@ -122,7 +156,7 @@ fun AskPackScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = { onDismiss() }) {
-                    Icon(Icons.Filled.Close, contentDescription = "Close", tint = MutedPastelTeal)
+                    Icon(Icons.Filled.Close, contentDescription = "Close", tint = AppTeal)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     val inactiveDot = Brush.linearGradient(listOf(SurfaceMuted, SurfaceMuted))
@@ -145,30 +179,31 @@ fun AskPackScreen(
                                 OutlinedTextField(
                                     value = text,
                                     onValueChange = { text = it },
-                                    placeholder = { Text("What are we looking for today?", fontSize = 28.sp, fontWeight = FontWeight.Black, color = DarkPastelAnthracite.copy(alpha = 0.35f)) },
+                                    placeholder = { Text("What are we looking for today?", fontSize = 28.sp, fontWeight = FontWeight.Black, color = AppDark.copy(alpha = 0.35f)) },
                                     modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 100.dp),
                                     textStyle = AppTextStyles.Heading2.copy(fontSize = 28.sp, lineHeight = 34.sp),
                                     colors = OutlinedTextFieldDefaults.colors(
                                         focusedBorderColor = Color.Transparent,
                                         unfocusedBorderColor = Color.Transparent,
-                                        focusedTextColor = DarkPastelAnthracite,
-                                        unfocusedTextColor = DarkPastelAnthracite,
+                                        focusedTextColor = AppDark,
+                                        unfocusedTextColor = AppDark,
                                         cursorColor = AppViolet
                                     )
                                 )
 
                                 Spacer(modifier = Modifier.height(24.dp))
 
-                                ConvexCardBox(
+                                Surface(
                                     modifier = Modifier.fillMaxWidth(),
                                     shape = RoundedCornerShape(24.dp),
-                                    elevation = 20.dp
+                                    color = AppWhite,
+                                    shadowElevation = 4.dp
                                 ) {
                                     Column(modifier = Modifier.padding(20.dp)) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(Icons.Filled.Notifications, contentDescription = null, tint = MutedPastelTeal, modifier = Modifier.size(20.dp))
+                                            Text("🔔", fontSize = 18.sp)
                                             Spacer(modifier = Modifier.width(8.dp))
-                                            Text("Signal options", style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold, color = DarkPastelAnthracite)
+                                            Text("Signal options", style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold, color = AppDark)
                                         }
 
                                         Spacer(modifier = Modifier.height(16.dp))
@@ -196,7 +231,7 @@ fun AskPackScreen(
                                                 ) {
                                                     Text(
                                                         tag,
-                                                        color = if (isSelected) Color.White else DarkPastelAnthracite,
+                                                        color = if (isSelected) Color.White else AppDark,
                                                         fontWeight = FontWeight.Bold,
                                                         fontSize = 13.sp
                                                     )
@@ -206,10 +241,28 @@ fun AskPackScreen(
 
                                         HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp), color = SurfaceMuted)
 
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(Icons.Filled.LocationOn, contentDescription = null, tint = MutedPastelTeal, modifier = Modifier.size(20.dp))
+                                        // Location input
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Icon(Icons.Filled.LocationOn, contentDescription = null, tint = AppTeal, modifier = Modifier.size(20.dp))
                                             Spacer(modifier = Modifier.width(8.dp))
-                                            Text("Current area", style = AppTextStyles.BodyMedium, color = DarkPastelAnthracite.copy(alpha = 0.75f))
+                                            androidx.compose.foundation.text.BasicTextField(
+                                                value = location,
+                                                onValueChange = { location = it },
+                                                modifier = Modifier.weight(1f),
+                                                textStyle = AppTextStyles.BodyMedium.copy(color = AppDark),
+                                                singleLine = true,
+                                                decorationBox = { inner ->
+                                                    Box {
+                                                        if (location.isEmpty()) {
+                                                            Text("Area or city (optional)", style = AppTextStyles.BodyMedium, color = AppMuted)
+                                                        }
+                                                        inner()
+                                                    }
+                                                }
+                                            )
                                         }
                                     }
                                 }
@@ -243,15 +296,22 @@ fun AskPackScreen(
                     2 -> {
                         Column(modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp)) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("Who to ask?", style = AppTextStyles.Heading1.copy(fontSize = 32.sp))
-                                Text("Choose friends to send the signal to", style = AppTextStyles.BodyMedium, color = DarkPastelAnthracite.copy(alpha = 0.55f), modifier = Modifier.padding(top = 8.dp, bottom = 24.dp))
+                                Text("Who to ask?", fontFamily = HeadingFontFamily, fontWeight = FontWeight.ExtraBold, fontSize = 26.sp, color = AppDark)
+                                Text("Choose friends to send the signal to", style = AppTextStyles.BodyMedium, color = AppMuted, modifier = Modifier.padding(top = 4.dp, bottom = 24.dp))
 
                                 Row(
                                     modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text("Your pack (${packUsers.size})", style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        text = if (selectedUsers.size == packUsers.size)
+                                            "Your pack (${packUsers.size})"
+                                        else
+                                            "Selected ${selectedUsers.size} of ${packUsers.size}",
+                                        style = AppTextStyles.BodyMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
                                     if (packUsers.isNotEmpty()) {
                                         Text(
                                             text = if (selectedUsers.size == packUsers.size) "Clear selection" else "Select all",
@@ -264,7 +324,7 @@ fun AskPackScreen(
 
                                 if (packUsers.isEmpty()) {
                                     Box(modifier = Modifier.fillMaxWidth().background(Color.White, RoundedCornerShape(24.dp)).padding(32.dp), contentAlignment = Alignment.Center) {
-                                        Text("Follow someone first in the People tab", style = AppTextStyles.BodyMedium, color = DarkPastelAnthracite.copy(alpha = 0.55f), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                                        Text("Follow someone first in the People tab", style = AppTextStyles.BodyMedium, color = AppDark.copy(alpha = 0.55f), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                                     }
                                 } else {
                                     LazyColumn(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -296,7 +356,7 @@ fun AskPackScreen(
                                                     Spacer(modifier = Modifier.width(16.dp))
                                                     Column {
                                                         Text(friend.name, style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold)
-                                                        Text(friend.handle, style = AppTextStyles.BodySmall, color = DarkPastelAnthracite.copy(alpha = 0.55f))
+                                                        Text(friend.handle, style = AppTextStyles.BodySmall, color = AppDark.copy(alpha = 0.55f))
                                                     }
                                                 }
 
@@ -319,20 +379,33 @@ fun AskPackScreen(
                                 }
                             }
 
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 16.dp)
-                                    .height(56.dp)
-                                    .clip(RoundedCornerShape(32.dp))
-                                    .background(PrimaryGradientLinear)
-                                    .clickable(enabled = !isSubmitting) { submitRequest() },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (isSubmitting) {
-                                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
-                                } else {
-                                    Text("Send signal", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            Column(modifier = Modifier.padding(vertical = 16.dp)) {
+                                // Error message
+                                if (errorMessage != null) {
+                                    Text(
+                                        text = "⚠ $errorMessage",
+                                        fontSize = 13.sp,
+                                        color = AppError,
+                                        fontFamily = BodyFontFamily,
+                                        modifier = Modifier.padding(bottom = 8.dp)
+                                    )
+                                }
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(56.dp)
+                                        .clip(RoundedCornerShape(32.dp))
+                                        .background(
+                                            if (!isSubmitting) PrimaryGradientLinear else DisabledGradient
+                                        )
+                                        .clickable(enabled = !isSubmitting) { submit() },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (isSubmitting) {
+                                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                                    } else {
+                                        Text("Send signal 🐺", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = Color.White, fontFamily = BodyFontFamily)
+                                    }
                                 }
                             }
                         }

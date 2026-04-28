@@ -23,8 +23,10 @@ import com.example.recommend.ui.explore.ExploreScreen
 import com.example.recommend.ui.feed.FeedScreen
 import com.example.recommend.ui.profile.ProfileScreen
 import com.example.recommend.ui.theme.SoftPastelMint
+import com.example.recommend.data.repository.CollectionRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.launch
 
 private enum class BusinessAddDestination { Hub, Campaign, Post }
 
@@ -52,15 +54,30 @@ fun AppNavigation(
     onAskModalOpenChange: (Boolean) -> Unit = {},
     onRegisterReset: (() -> Unit) -> Unit = {},
     onCreationFlowActive: (Boolean) -> Unit = {},
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    isLoadingMore: Boolean = false,
+    canLoadMore: Boolean = true,
+    onLoadMore: () -> Unit = {}
 ) {
     val db = FirebaseFirestore.getInstance()
     val currentUser = FirebaseAuth.getInstance().currentUser
+    val collectionRepo = remember { CollectionRepository(db) }
+    val coroutineScope = rememberCoroutineScope()
 
     // --- overlay state ---
     var activeRequest by remember { mutableStateOf<PackRequest?>(null) }
     var postToSave by remember { mutableStateOf<String?>(null) }
-    var activeCollection by remember { mutableStateOf<PostCollection?>(null) }
+    // Стек открытых коллекций — позволяет заходить в подколлекцию и возвращаться к родителю по back.
+    var collectionStack by remember { mutableStateOf<List<PostCollection>>(emptyList()) }
+    val activeCollection: PostCollection? = collectionStack.lastOrNull()
+    // Диалог создания коллекции/подколлекции.
+    // Если parentIdForNewCollection != null → создаём подколлекцию,
+    // если parentIdForNewCollection == null и creatingCollection == true → root.
+    var creatingCollection by remember { mutableStateOf(false) }
+    var parentIdForNewCollection by remember { mutableStateOf<String?>(null) }
+    var parentNameForNewCollection by remember { mutableStateOf<String?>(null) }
+    // Если задано — следующий пост, созданный в AddScreen, попадёт в эту коллекцию автоматически
+    var targetCollectionIdForAdd by remember { mutableStateOf<String?>(null) }
     var businessAddDestination by remember { mutableStateOf(BusinessAddDestination.Hub) }
     var viewUserProfileId by remember { mutableStateOf<String?>(null) }
     var openPostId by remember { mutableStateOf<String?>(null) }
@@ -112,7 +129,10 @@ fun AppNavigation(
         onRegisterReset {
             activeRequest = null
             postToSave = null
-            activeCollection = null
+            collectionStack = emptyList()
+            creatingCollection = false
+            parentIdForNewCollection = null
+            parentNameForNewCollection = null
             viewUserProfileId = null
             openPostId = null
             selectedOfferId = null
@@ -122,6 +142,7 @@ fun AppNavigation(
             createCampaignOverlay = false
             linkedOfferIdForAdd = null
             linkedOfferTitleForAdd = null
+            targetCollectionIdForAdd = null
             onAskModalOpenChange(false)
         }
     }
@@ -176,7 +197,10 @@ fun AppNavigation(
                     viewerUid = currentUser?.uid,
                     onAudienceRate = { postId, stars -> ratePost(postId, stars) },
                     onOpenPost = { openPostId = it },
-                    onWalletClick = { navController.navigate("profile") }
+                    onWalletClick = { navController.navigate("profile") },
+                    isLoadingMore = isLoadingMore,
+                    canLoadMore = canLoadMore,
+                    onLoadMore = onLoadMore
                 )
             }
 
@@ -207,15 +231,25 @@ fun AppNavigation(
                                 linkedRequestIdForAdd = null
                                 linkedOfferIdForAdd = null
                                 linkedOfferTitleForAdd = null
+                                // если пост был адресован в коллекцию — возвращаем пользователя в неё
+                                val backToCollectionId = targetCollectionIdForAdd
+                                targetCollectionIdForAdd = null
                                 businessAddDestination = BusinessAddDestination.Hub
-                                navController.navigate("feed")
+                                if (backToCollectionId != null) {
+                                    navController.navigate("profile") { launchSingleTop = true }
+                                    val target = userCollections.find { it.id == backToCollectionId }
+                                    if (target != null) collectionStack = listOf(target)
+                                } else {
+                                    navController.navigate("feed")
+                                }
                             },
                             currentUserProfile = currentUserProfile,
                             onBack = { businessAddDestination = BusinessAddDestination.Hub },
                             requestId = linkedRequestIdForAdd,
                             offerId = linkedOfferIdForAdd,
                             offerTitle = linkedOfferTitleForAdd,
-                            isSponsored = linkedOfferIdForAdd != null
+                            isSponsored = linkedOfferIdForAdd != null,
+                            targetCollectionId = targetCollectionIdForAdd
                         )
                     }
                 } else {
@@ -225,15 +259,24 @@ fun AppNavigation(
                                 linkedRequestIdForAdd = null
                                 linkedOfferIdForAdd = null
                                 linkedOfferTitleForAdd = null
+                                val backToCollectionId = targetCollectionIdForAdd
+                                targetCollectionIdForAdd = null
                                 userInAddForm = false
-                                navController.navigate("feed")
+                                if (backToCollectionId != null) {
+                                    navController.navigate("profile") { launchSingleTop = true }
+                                    val target = userCollections.find { it.id == backToCollectionId }
+                                    if (target != null) collectionStack = listOf(target)
+                                } else {
+                                    navController.navigate("feed")
+                                }
                             },
                             currentUserProfile = currentUserProfile,
                             onBack = { userInAddForm = false },
                             requestId = linkedRequestIdForAdd,
                             offerId = linkedOfferIdForAdd,
                             offerTitle = linkedOfferTitleForAdd,
-                            isSponsored = linkedOfferIdForAdd != null
+                            isSponsored = linkedOfferIdForAdd != null,
+                            targetCollectionId = targetCollectionIdForAdd
                         )
                     } else {
                         AddHubScreen(
@@ -256,7 +299,12 @@ fun AppNavigation(
                         participatingPromoCampaignsCount = participatingPromoCampaignsCount,
                         profileSurfaceOrdinal = profileSurfaceOrdinal,
                         onProfileSurfaceChange = { profileSurfaceOrdinal = it.coerceIn(0, 1) },
-                        onCollectionClick = { activeCollection = it },
+                        onCollectionClick = { collectionStack = listOf(it) },
+                        onCreateCollection = {
+                            parentIdForNewCollection = null
+                            parentNameForNewCollection = null
+                            creatingCollection = true
+                        },
                         onPostClick = { openPostId = it },
                         onCreateCampaign = { createCampaignOverlay = true },
                         onOfferClick = { selectedOfferId = it.id },
@@ -316,17 +364,72 @@ fun AppNavigation(
         }
 
         if (activeCollection != null) {
+            // Если коллекция была обновлена в реалтайме — берём свежую версию из стрима
+            val liveCollection = userCollections.find { it.id == activeCollection.id } ?: activeCollection
+            val isOwner = liveCollection.userId == currentUser?.uid
+            val children = userCollections.filter { it.parentId == liveCollection.id }
             CollectionDetailScreen(
-                collection = activeCollection!!,
-                posts = posts.filter { activeCollection!!.postIds.contains(it.id) },
+                collection = liveCollection,
+                posts = posts.filter { liveCollection.postIds.contains(it.id) },
                 savedPostIds = savedPostIds,
                 users = allUsers,
-                onBack = { activeCollection = null },
+                subCollections = children,
+                canEdit = isOwner,
+                // back: pop top of stack — окажемся либо в родителе, либо вернёмся в профиль
+                onBack = { collectionStack = collectionStack.dropLast(1) },
                 onSaveClick = { postToSave = it },
                 onUserProfileClick = { viewUserProfileId = it },
                 viewerUid = currentUser?.uid,
                 onAudienceRate = { postId, stars -> ratePost(postId, stars) },
-                onOpenPost = { openPostId = it }
+                onOpenPost = { openPostId = it },
+                onCreateSubCollection = {
+                    parentIdForNewCollection = liveCollection.id
+                    parentNameForNewCollection = liveCollection.name
+                    creatingCollection = true
+                },
+                // push: добавляем подколлекцию поверх стека
+                onSubCollectionClick = { sub -> collectionStack = collectionStack + sub },
+                onAddPost = {
+                    // Создание нового поста сразу с привязкой к коллекции.
+                    // ВАЖНО: закрываем оверлей коллекции, иначе AddScreen открывается ПОД ним
+                    // (CollectionDetailScreen рендерится поверх NavHost). Стек восстановится
+                    // в onPostAdded после публикации — вернём пользователя ровно в эту коллекцию.
+                    targetCollectionIdForAdd = liveCollection.id
+                    collectionStack = emptyList()
+                    if (currentUserProfile?.isBusiness == true) {
+                        businessAddDestination = BusinessAddDestination.Post
+                    } else {
+                        userInAddForm = true
+                    }
+                    navController.navigate("add") { launchSingleTop = true }
+                },
+                onRename = { newName ->
+                    coroutineScope.launch {
+                        runCatching { collectionRepo.renameCollection(liveCollection.id, newName) }
+                    }
+                },
+                onDelete = {
+                    val deletedId = liveCollection.id
+                    coroutineScope.launch {
+                        runCatching { collectionRepo.deleteCollection(deletedId) }
+                    }
+                    // Закрываем удалённую коллекцию (popим из стека)
+                    collectionStack = collectionStack.dropLast(1)
+                }
+            )
+        }
+
+        // Диалог создания коллекции / подколлекции
+        if (creatingCollection && currentUser != null) {
+            CreateCollectionDialog(
+                parentId = parentIdForNewCollection,
+                parentName = parentNameForNewCollection,
+                onDismiss = {
+                    creatingCollection = false
+                    parentIdForNewCollection = null
+                    parentNameForNewCollection = null
+                },
+                onCreated = { /* стрим Firestore сам обновит UI */ }
             )
         }
 
@@ -341,7 +444,7 @@ fun AppNavigation(
                     userPosts = posts.filter { it.userId == viewUserProfileId },
                     onBack = { viewUserProfileId = null },
                     onPostClick = { openPostId = it },
-                    onCollectionClick = { activeCollection = it },
+                    onCollectionClick = { collectionStack = listOf(it) },
                     onOfferClick = { offer ->
                         profileOfferCache = offer
                         selectedOfferId = offer.id

@@ -40,6 +40,15 @@ class FeedViewModel : ViewModel() {
     private val _posts = MutableStateFlow<List<Post>>(emptyList())
     val posts: StateFlow<List<Post>> = _posts.asStateFlow()
 
+    /** Pages loaded via "load more" (older than the real-time first page). */
+    private val _olderPosts = MutableStateFlow<List<Post>>(emptyList())
+
+    private val _isLoadingMore = MutableStateFlow(false)
+    val isLoadingMore: StateFlow<Boolean> = _isLoadingMore.asStateFlow()
+
+    private val _canLoadMore = MutableStateFlow(true)
+    val canLoadMore: StateFlow<Boolean> = _canLoadMore.asStateFlow()
+
     private val _allUsers = MutableStateFlow<List<UserProfile>>(emptyList())
     val allUsers: StateFlow<List<UserProfile>> = _allUsers.asStateFlow()
 
@@ -75,25 +84,30 @@ class FeedViewModel : ViewModel() {
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
 
     /**
-     * Посты для главной ленты:
-     * — только от пользователей из following (+ свои посты)
-     * — без ответов на запросы (replyToRequestId)
-     * — fallback: если ещё никого не фолловишь — показываем всех (cold start)
+     * Feed posts:
+     * — real-time first page (_posts) + paginated older posts (_olderPosts), deduplicated
+     * — only from following + own posts (cold-start fallback: show all)
+     * — no replies to requests (replyToRequestId must be blank)
      */
-    val feedPostsForHome: StateFlow<List<Post>> = combine(_posts, _currentUser) { posts, currentUser ->
-        val uid = currentUser?.uid
-        val following = currentUser?.following?.toSet() ?: emptySet()
-        val filtered = posts.filter { post ->
-            post.replyToRequestId.isNullOrBlank() &&
-            (post.userId == uid || following.contains(post.userId))
-        }
-        // Cold start: если никого не фолловим — показываем всех
-        if (following.isEmpty()) {
-            posts.filter { it.replyToRequestId.isNullOrBlank() }
-        } else {
-            filtered
-        }
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val feedPostsForHome: StateFlow<List<Post>> =
+        combine(_posts, _olderPosts, _currentUser) { live, older, currentUser ->
+            // Merge: live page takes precedence; older pages fill in the rest
+            val liveIds = live.map { it.id }.toSet()
+            val allPosts = live + older.filter { it.id !in liveIds }
+
+            val uid = currentUser?.uid
+            val following = currentUser?.following?.toSet() ?: emptySet()
+            val filtered = allPosts.filter { post ->
+                post.replyToRequestId.isNullOrBlank() &&
+                (post.userId == uid || following.contains(post.userId))
+            }
+            // Cold start: if not following anyone yet — show everyone
+            if (following.isEmpty()) {
+                allPosts.filter { it.replyToRequestId.isNullOrBlank() }
+            } else {
+                filtered
+            }
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     /**
      * Active offers shown in the feed carousel.
@@ -110,6 +124,31 @@ class FeedViewModel : ViewModel() {
             it.minTrustScore <= userTrustScore
         }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** Load the next page of posts older than the oldest post currently loaded. */
+    fun loadMorePosts() {
+        if (_isLoadingMore.value || !_canLoadMore.value) return
+        val oldestTimestamp = (_olderPosts.value.lastOrNull() ?: _posts.value.lastOrNull())
+            ?.createdAt ?: return
+
+        viewModelScope.launch {
+            _isLoadingMore.value = true
+            try {
+                val newPosts = postRepo.loadMorePosts(oldestTimestamp)
+                if (newPosts.isEmpty() || newPosts.size < PostRepository.PAGE_SIZE.toInt()) {
+                    _canLoadMore.value = false
+                }
+                if (newPosts.isNotEmpty()) {
+                    val existingIds = (_posts.value + _olderPosts.value).map { it.id }.toSet()
+                    _olderPosts.value = _olderPosts.value + newPosts.filter { it.id !in existingIds }
+                }
+            } catch (_: Exception) {
+                // Network error — silently ignore; user can scroll back up and retry
+            } finally {
+                _isLoadingMore.value = false
+            }
+        }
+    }
 
     init {
         val uid = currentUid

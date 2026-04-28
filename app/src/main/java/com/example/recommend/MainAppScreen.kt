@@ -57,6 +57,8 @@ fun MainAppScreen(onLogout: () -> Unit) {
     val isLoading by feedViewModel.isLoading.collectAsStateWithLifecycle()
     val feedPostsForHome by feedViewModel.feedPostsForHome.collectAsStateWithLifecycle()
     val feedOffersForHome by feedViewModel.feedOffersForHome.collectAsStateWithLifecycle()
+    val isLoadingMore by feedViewModel.isLoadingMore.collectAsStateWithLifecycle()
+    val canLoadMore by feedViewModel.canLoadMore.collectAsStateWithLifecycle()
 
     val myPosts by profileViewModel.myPosts.collectAsStateWithLifecycle()
     val userCollections by profileViewModel.userCollections.collectAsStateWithLifecycle()
@@ -228,7 +230,10 @@ fun MainAppScreen(onLogout: () -> Unit) {
             onAskModalOpenChange = { isAskModalOpen = it },
             onRegisterReset = { resetOverlaysFn = it },
             onCreationFlowActive = { isActuallyCreating = it },
-            onLogout = onLogout
+            onLogout = onLogout,
+            isLoadingMore = isLoadingMore,
+            canLoadMore = canLoadMore,
+            onLoadMore = { feedViewModel.loadMorePosts() }
         )
     }
 

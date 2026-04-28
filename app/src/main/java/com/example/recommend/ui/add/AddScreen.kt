@@ -53,12 +53,14 @@ fun AddScreen(
     offerId: String? = null,
     /** Offer title shown in the sponsored banner so the user knows what content to create. */
     offerTitle: String? = null,
-    isSponsored: Boolean = false
+    isSponsored: Boolean = false,
+    /** If set, the new post is automatically added to this collection's postIds. */
+    targetCollectionId: String? = null
 ) {
     var title by remember { mutableStateOf("") }
     var location by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
-    var selectedCategory by remember { mutableStateOf("Food") }
+    var selectedCategory by remember { mutableStateOf(PostCategory.FOOD) }
     var isUploading by remember { mutableStateOf(false) }
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
 
@@ -74,7 +76,7 @@ fun AddScreen(
     val compressExecutor = remember { Executors.newSingleThreadExecutor() }
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
 
-    val categories = listOf("🍜 Food", "☕ Coffee", "🌿 Places", "🎉 Events", "🛍 Shopping", "💅 Beauty", "🔧 Services")
+    val categories = PostCategory.all
 
     fun writePostDocument(imageUrl: String?) {
         val currentUser = auth.currentUser
@@ -85,7 +87,7 @@ fun AddScreen(
             "userId" to (currentUser?.uid ?: ""),
             "title" to title,
             "description" to description,
-            "category" to selectedCategory,
+            "category" to selectedCategory.firestoreKey,
             "location" to location,
             "rating" to 5,
             "authorName" to authorName,
@@ -103,10 +105,25 @@ fun AddScreen(
         db.trustListDataRoot()
             .collection("posts")
             .add(postData)
-            .addOnSuccessListener {
-                isUploading = false
-                Toast.makeText(context, "Recommendation published!", Toast.LENGTH_SHORT).show()
-                onPostAdded()
+            .addOnSuccessListener { ref ->
+                val newPostId = ref.id
+                val collectionId = targetCollectionId
+                if (!collectionId.isNullOrBlank()) {
+                    // Сразу кладём пост в указанную коллекцию.
+                    db.trustListDataRoot()
+                        .collection("collections")
+                        .document(collectionId)
+                        .update("postIds", com.google.firebase.firestore.FieldValue.arrayUnion(newPostId))
+                        .addOnCompleteListener {
+                            isUploading = false
+                            Toast.makeText(context, "Added to collection!", Toast.LENGTH_SHORT).show()
+                            onPostAdded()
+                        }
+                } else {
+                    isUploading = false
+                    Toast.makeText(context, "Recommendation published!", Toast.LENGTH_SHORT).show()
+                    onPostAdded()
+                }
             }
             .addOnFailureListener { e ->
                 isUploading = false
@@ -351,8 +368,7 @@ fun AddScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         categories.forEach { cat ->
-                            val label = cat.substringAfter(" ")
-                            val isSelected = selectedCategory == label
+                            val isSelected = selectedCategory == cat
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(32.dp))
@@ -365,12 +381,12 @@ fun AddScreen(
                                         if (isSelected) Color.Transparent else Color(0xFFE8E6E0),
                                         RoundedCornerShape(32.dp)
                                     )
-                                    .clickable { selectedCategory = label }
+                                    .clickable { selectedCategory = cat }
                                     .padding(horizontal = 14.dp, vertical = 8.dp),
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    cat,
+                                    cat.chipLabel,
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = if (isSelected) Color.White else AppDark,

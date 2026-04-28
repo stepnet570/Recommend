@@ -13,6 +13,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -27,6 +28,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -279,7 +281,10 @@ fun FeedScreen(
     viewerUid: String? = null,
     onAudienceRate: (String, Int) -> Unit = { _, _ -> },
     onOpenPost: ((String) -> Unit)? = null,
-    onWalletClick: () -> Unit = {}
+    onWalletClick: () -> Unit = {},
+    isLoadingMore: Boolean = false,
+    canLoadMore: Boolean = true,
+    onLoadMore: () -> Unit = {}
 ) {
     var searchQuery by remember { mutableStateOf("") }
     val currentUserName = remember(viewerUid, users) {
@@ -318,8 +323,27 @@ fun FeedScreen(
         requests.filter { it.status.equals("active", ignoreCase = true) }
     }
 
+    val listState = rememberLazyListState()
+
+    // Trigger loadMore when the user is 3 items from the bottom
+    LaunchedEffect(listState, canLoadMore, isLoadingMore) {
+        snapshotFlow {
+            val info = listState.layoutInfo
+            val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: 0
+            val total = info.totalItemsCount
+            lastVisible to total
+        }
+            .distinctUntilChanged()
+            .collect { (lastVisible, total) ->
+                if (total > 0 && lastVisible >= total - 3 && canLoadMore && !isLoadingMore) {
+                    onLoadMore()
+                }
+            }
+    }
+
     Scaffold(containerColor = AppBackground) { paddingValues ->
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
@@ -405,6 +429,30 @@ fun FeedScreen(
                         onAudienceRate = onAudienceRate,
                         onOpenPost = onOpenPost
                     )
+                }
+
+                // Pagination footer
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        when {
+                            isLoadingMore -> CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                color = AppViolet,
+                                strokeWidth = 2.5.dp
+                            )
+                            !canLoadMore -> Text(
+                                text = "You've seen everything 🐺",
+                                fontFamily = BodyFontFamily,
+                                fontSize = 13.sp,
+                                color = AppMuted
+                            )
+                        }
+                    }
                 }
             }
         }

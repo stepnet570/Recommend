@@ -62,7 +62,7 @@ fun AskPackScreen(
     var step by remember { mutableStateOf(1) }
     var text by remember { mutableStateOf("") }
     var location by remember { mutableStateOf("") }
-    var selectedTags by remember { mutableStateOf(setOf<String>()) }
+    var selectedTags by remember { mutableStateOf(setOf<PostCategory>()) }
     var selectedUsers by remember { mutableStateOf(setOf<String>()) }
     var isSubmitting by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -76,7 +76,7 @@ fun AskPackScreen(
     val currentOnDismiss by rememberUpdatedState(onDismiss)
     val currentOnCreated by rememberUpdatedState(onCreated)
 
-    val availableTags = listOf("🍔 Eat", "🍷 Drink", "🆘 Urgent", "📅 Date", "🔧 Services", "🎉 Party")
+    val availableTags = PostCategory.all
 
     val packUsers = users.filter { currentUserProfile?.following?.contains(it.uid) == true }
 
@@ -109,7 +109,7 @@ fun AskPackScreen(
             "userId" to currentUser.uid,
             "authorName" to authorName,
             "text" to text.trim(),
-            "tags" to selectedTags.toList(),
+            "tags" to selectedTags.map { it.firestoreKey },
             "location" to location.trim().ifBlank { "Current area" },
             "selectedUsers" to selectedUsers.toList(),
             "status" to "active",
@@ -118,9 +118,10 @@ fun AskPackScreen(
 
         Log.d("AskPack", "Submitting request: text=${text.trim()}, users=${selectedUsers.size}")
 
+        isSubmitting = true
+        errorMessage = null
+
         scope.launch {
-            isSubmitting = true
-            errorMessage = null
             try {
                 val ref = db.trustListDataRoot()
                     .collection("requests")
@@ -131,10 +132,11 @@ fun AskPackScreen(
                 currentOnCreated()
             } catch (e: Exception) {
                 Log.e("AskPack", "Firestore error: ${e.message}", e)
-                isSubmitting = false
                 val msg = e.message ?: "Failed to send"
                 errorMessage = msg
                 Toast.makeText(context, "Error: $msg", Toast.LENGTH_LONG).show()
+            } finally {
+                isSubmitting = false
             }
         }
     }
@@ -230,7 +232,7 @@ fun AskPackScreen(
                                                         .padding(horizontal = 16.dp, vertical = 10.dp)
                                                 ) {
                                                     Text(
-                                                        tag,
+                                                        tag.chipLabel,
                                                         color = if (isSelected) Color.White else AppDark,
                                                         fontWeight = FontWeight.Bold,
                                                         fontSize = 13.sp

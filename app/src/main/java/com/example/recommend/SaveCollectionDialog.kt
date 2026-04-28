@@ -1,6 +1,7 @@
 package com.example.recommend
 
 import com.example.recommend.data.model.*
+import com.example.recommend.data.repository.CollectionRepository
 import com.example.recommend.ui.theme.*
 
 import androidx.compose.foundation.clickable
@@ -25,6 +26,7 @@ import com.example.recommend.ui.theme.MutedPastelTeal
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.launch
 
 
 @Composable
@@ -35,9 +37,11 @@ fun SaveCollectionDialog(
     var newCollectionName by remember { mutableStateOf("") }
     var collections by remember { mutableStateOf<List<PostCollection>>(emptyList()) }
 
-    val db = FirebaseFirestore.getInstance()
+    val db = remember { FirebaseFirestore.getInstance() }
+    val repo = remember { CollectionRepository(db) }
     val userId = FirebaseAuth.getInstance().currentUser?.uid ?: return
     val scheme = MaterialTheme.colorScheme
+    val scope = rememberCoroutineScope()
 
     val postSavedInAnyCollection = collections.any { it.postIds.contains(postId) }
 
@@ -53,6 +57,8 @@ fun SaveCollectionDialog(
                             userId = doc.getString("userId") ?: "",
                             name = doc.getString("name") ?: "",
                             postIds = (doc.get("postIds") as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
+                            parentId = doc.getString("parentId"),
+                            coverPostId = doc.getString("coverPostId"),
                             createdAt = doc.getLong("createdAt") ?: 0L
                         )
                     }
@@ -60,19 +66,19 @@ fun SaveCollectionDialog(
             }
     }
 
-    fun createCollection() {
+    fun createRootCollection() {
         val name = newCollectionName.trim()
         if (name.isEmpty()) return
-        val newCol = hashMapOf(
-            "userId" to userId,
-            "name" to name,
-            "postIds" to listOf(postId),
-            "createdAt" to System.currentTimeMillis()
-        )
-        db.trustListDataRoot()
-            .collection("collections").add(newCol)
-        newCollectionName = ""
+        scope.launch {
+            try {
+                repo.createCollection(uid = userId, name = name, parentId = null, seedPostId = postId)
+                newCollectionName = ""
+            } catch (_: Throwable) { /* no-op */ }
+        }
     }
+
+    // Сортируем как дерево: root → его дети сразу за ним
+    val sortedTree = remember(collections) { buildTreeOrder(collections) }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -113,7 +119,7 @@ fun SaveCollectionDialog(
                         colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = scheme.primary)
                     )
                     Button(
-                        onClick = { createCollection() },
+                        onClick = { createRootCollection() },
                         enabled = newCollectionName.isNotBlank(),
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = scheme.primary, contentColor = scheme.onPrimary)
@@ -133,15 +139,18 @@ fun SaveCollectionDialog(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 LazyColumn(
-                    modifier = Modifier.heightIn(max = 300.dp),
+                    modifier = Modifier.heightIn(max = 320.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(collections) { collection ->
+                    items(sortedTree, key = { it.collection.id }) { node ->
+                        val collection = node.collection
                         val isSaved = collection.postIds.contains(postId)
+                        val depth = node.depth
 
                         Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .padding(start = (depth * 16).dp)
                                 .clickable {
                                     val ref = db.trustListDataRoot()
                                         .collection("collections").document(collection.id)
@@ -160,7 +169,18 @@ fun SaveCollectionDialog(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text(collection.name, style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Medium)
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = if (depth > 0) "↳ " else "",
+                                        fontSize = 14.sp,
+                                        color = AppMuted
+                                    )
+                                    Text(
+                                        collection.name,
+                                        style = AppTextStyles.BodyMedium,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
                                 if (isSaved) {
                                     Icon(Icons.Filled.CheckCircle, contentDescription = null, tint = MutedPastelTeal)
                                 }
@@ -204,4 +224,23 @@ fun SaveCollectionDialog(
             }
         }
     }
+}
+
+// ─── tree ordering helpers ────────────────────────────────────────────────────
+
+private data class CollectionNode(val collection: PostCollection, val depth: Int)
+
+/** Сортируем "depth-first": каждый root, сразу за ним его дети. */
+private fun buildTreeOrder(all: List<PostCollection>): List<CollectionNode> {
+    val byParent = all.groupBy { it.parentId }
+    val roots = (byParent[null] ?: emptyList()).sortedByDescending { it.createdAt }
+    val result = mutableListOf<CollectionNode>()
+    roots.forEach { root ->
+        result += CollectionNode(root, 0)
+        val children = (byParent[root.id] ?: emptyList()).sortedByDescending { it.createdAt }
+        children.forEach { child ->
+            result += CollectionNode(child, 1)
+        }
+    }
+    return result
 }

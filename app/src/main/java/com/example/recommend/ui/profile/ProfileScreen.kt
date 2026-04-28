@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bookmarks
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Pause
@@ -70,6 +71,7 @@ fun ProfileScreen(
     profileSurfaceOrdinal: Int = 0,
     onProfileSurfaceChange: (Int) -> Unit = {},
     onCollectionClick: (PostCollection) -> Unit = {},
+    onCreateCollection: () -> Unit = {},
     onPostClick: (String) -> Unit = {},
     onCreateCampaign: () -> Unit = {},
     onOfferClick: (AdOffer) -> Unit = {},
@@ -340,6 +342,7 @@ fun ProfileScreen(
             isBusiness = userProfile.isBusiness,
             onPostClick = onPostClick,
             onCollectionClick = onCollectionClick,
+            onCreateCollection = onCreateCollection,
             onCreateCampaign = onCreateCampaign,
             onOfferClick = onOfferClick,
             onOfferPauseToggle = onOfferPauseToggle,
@@ -413,6 +416,7 @@ internal fun LazyListScope.personalRecsAndCollectionsSection(
     isBusiness: Boolean = false,
     onPostClick: (String) -> Unit,
     onCollectionClick: (PostCollection) -> Unit,
+    onCreateCollection: () -> Unit = {},
     onCreateCampaign: () -> Unit = {},
     onOfferClick: (AdOffer) -> Unit = {},
     onOfferPauseToggle: (AdOffer) -> Unit = {},
@@ -496,10 +500,25 @@ internal fun LazyListScope.personalRecsAndCollectionsSection(
 
         // ── Collections ───────────────────────────────────────────────────────
         1 -> {
-            if (collections.isEmpty()) {
+            // Показываем только root-коллекции (parentId == null)
+            val roots = collections.filter { it.parentId == null }
+            // Считаем количество детей для каждого root
+            val childCountByParent = collections
+                .mapNotNull { it.parentId }
+                .groupingBy { it }
+                .eachCount()
+
+            // Карточка "+ New collection" + root-коллекции в одной 2-колоночной сетке
+            // (только для владельца профиля)
+            val gridItems = buildList<CollectionGridItem> {
+                if (isViewerOwner) add(CollectionGridItem.AddNew)
+                addAll(roots.map { CollectionGridItem.Item(it) })
+            }
+
+            if (gridItems.isEmpty()) {
                 item { EmptyStateCard("No collections yet") }
             } else {
-                val rows = collections.chunked(2)
+                val rows = gridItems.chunked(2)
                 items(rows) { rowItems ->
                     Row(
                         modifier = Modifier
@@ -508,12 +527,19 @@ internal fun LazyListScope.personalRecsAndCollectionsSection(
                             .padding(bottom = 10.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        rowItems.forEach { col ->
-                            CollectionCard(
-                                collection = col,
-                                modifier = Modifier.weight(1f),
-                                onClick = { onCollectionClick(col) }
-                            )
+                        rowItems.forEach { item ->
+                            when (item) {
+                                CollectionGridItem.AddNew -> NewCollectionCard(
+                                    modifier = Modifier.weight(1f),
+                                    onClick = onCreateCollection
+                                )
+                                is CollectionGridItem.Item -> CollectionCard(
+                                    collection = item.collection,
+                                    childCount = childCountByParent[item.collection.id] ?: 0,
+                                    modifier = Modifier.weight(1f),
+                                    onClick = { onCollectionClick(item.collection) }
+                                )
+                            }
                         }
                         if (rowItems.size == 1) Spacer(Modifier.weight(1f))
                     }
@@ -842,10 +868,17 @@ fun PostSmallCard(post: Post, onClick: () -> Unit = {}) {
     }
 }
 
+// Sealed-тип для смешанной сетки коллекций (включая карточку "+ New collection")
+internal sealed interface CollectionGridItem {
+    data object AddNew : CollectionGridItem
+    data class Item(val collection: PostCollection) : CollectionGridItem
+}
+
 @Composable
 fun CollectionCard(
     collection: PostCollection,
     modifier: Modifier = Modifier,
+    childCount: Int = 0,
     onClick: () -> Unit
 ) {
     Surface(
@@ -880,11 +913,81 @@ fun CollectionCard(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(top = 3.dp)
+            ) {
+                Text(
+                    "${collection.postIds.size} picks",
+                    fontFamily = BodyFontFamily,
+                    fontSize = 12.sp,
+                    color = AppMuted
+                )
+                if (childCount > 0) {
+                    Text(
+                        " · 📂 $childCount",
+                        fontFamily = BodyFontFamily,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 12.sp,
+                        color = AppViolet
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun NewCollectionCard(
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = AppViolet.copy(alpha = 0.06f),
+        modifier = modifier
+            .clickable { onClick() }
+            .aspectRatio(1f)
+            .border(
+                width = 1.5.dp,
+                color = AppViolet.copy(alpha = 0.35f),
+                shape = RoundedCornerShape(16.dp)
+            )
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(AppViolet.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Filled.Add,
+                    contentDescription = "New collection",
+                    tint = AppViolet,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            Spacer(Modifier.height(10.dp))
             Text(
-                "${collection.postIds.size} picks",
+                "New collection",
+                fontFamily = HeadingFontFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 14.sp,
+                color = AppViolet,
+                textAlign = TextAlign.Center,
+                maxLines = 1
+            )
+            Text(
+                "Tap to create",
                 fontFamily = BodyFontFamily,
                 fontSize = 12.sp,
-                color = AppMuted,
+                color = AppViolet.copy(alpha = 0.65f),
                 modifier = Modifier.padding(top = 3.dp)
             )
         }

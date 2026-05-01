@@ -57,9 +57,12 @@ fun MainAppScreen(onLogout: () -> Unit) {
     val isLoading by feedViewModel.isLoading.collectAsStateWithLifecycle()
     val feedPostsForHome by feedViewModel.feedPostsForHome.collectAsStateWithLifecycle()
     val feedOffersForHome by feedViewModel.feedOffersForHome.collectAsStateWithLifecycle()
+    val isLoadingMore by feedViewModel.isLoadingMore.collectAsStateWithLifecycle()
+    val canLoadMore by feedViewModel.canLoadMore.collectAsStateWithLifecycle()
 
     val myPosts by profileViewModel.myPosts.collectAsStateWithLifecycle()
     val userCollections by profileViewModel.userCollections.collectAsStateWithLifecycle()
+    val hasMoreCollections by profileViewModel.hasMoreCollections.collectAsStateWithLifecycle()
     val myOffers by profileViewModel.myOffers.collectAsStateWithLifecycle()
     val followersCount by profileViewModel.followersCount.collectAsStateWithLifecycle()
     val participatingCount by profileViewModel.participatingPromoCampaignsCount.collectAsStateWithLifecycle()
@@ -221,6 +224,8 @@ fun MainAppScreen(onLogout: () -> Unit) {
             feedOffersForHome = feedOffersForHome,
             myPosts = myPosts,
             userCollections = userCollections,
+            hasMoreCollections = hasMoreCollections,
+            onLoadMoreCollections = { profileViewModel.loadMoreCollections() },
             myOffers = myOffers,
             followersCount = followersCount,
             participatingPromoCampaignsCount = participatingCount,
@@ -228,7 +233,10 @@ fun MainAppScreen(onLogout: () -> Unit) {
             onAskModalOpenChange = { isAskModalOpen = it },
             onRegisterReset = { resetOverlaysFn = it },
             onCreationFlowActive = { isActuallyCreating = it },
-            onLogout = onLogout
+            onLogout = onLogout,
+            isLoadingMore = isLoadingMore,
+            canLoadMore = canLoadMore,
+            onLoadMore = { feedViewModel.loadMorePosts() }
         )
     }
 

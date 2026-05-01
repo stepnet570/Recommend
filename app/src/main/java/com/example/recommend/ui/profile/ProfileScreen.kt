@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bookmarks
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Pause
@@ -70,13 +71,18 @@ fun ProfileScreen(
     profileSurfaceOrdinal: Int = 0,
     onProfileSurfaceChange: (Int) -> Unit = {},
     onCollectionClick: (PostCollection) -> Unit = {},
+    onCreateCollection: () -> Unit = {},
+    hasMoreCollections: Boolean = false,
+    onLoadMoreCollections: () -> Unit = {},
     onPostClick: (String) -> Unit = {},
     onCreateCampaign: () -> Unit = {},
     onOfferClick: (AdOffer) -> Unit = {},
     onOfferPauseToggle: (AdOffer) -> Unit = {},
     isViewingOtherUser: Boolean = false,
     onBack: (() -> Unit)? = null,
-    onLogout: () -> Unit = {}
+    onLogout: () -> Unit = {},
+    /** Reverse switch — only shown when userProfile.isBusiness == true. */
+    onSwitchToPersonal: () -> Unit = {}
 ) {
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     var isAvatarUploading by remember { mutableStateOf(false) }
@@ -316,6 +322,16 @@ fun ProfileScreen(
                     }
                 }
 
+                // Switch back to personal (business accounts only)
+                if (!isViewingOtherUser && userProfile.isBusiness) {
+                    ProfileOutlinedButton(
+                        text = "Switch to personal account",
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                    ) {
+                        onSwitchToPersonal()
+                    }
+                }
+
                 // Logout button (own profile only)
                 if (!isViewingOtherUser) {
                     ProfileOutlinedButton(
@@ -340,6 +356,9 @@ fun ProfileScreen(
             isBusiness = userProfile.isBusiness,
             onPostClick = onPostClick,
             onCollectionClick = onCollectionClick,
+            onCreateCollection = onCreateCollection,
+            hasMoreCollections = hasMoreCollections,
+            onLoadMoreCollections = onLoadMoreCollections,
             onCreateCampaign = onCreateCampaign,
             onOfferClick = onOfferClick,
             onOfferPauseToggle = onOfferPauseToggle,
@@ -413,6 +432,9 @@ internal fun LazyListScope.personalRecsAndCollectionsSection(
     isBusiness: Boolean = false,
     onPostClick: (String) -> Unit,
     onCollectionClick: (PostCollection) -> Unit,
+    onCreateCollection: () -> Unit = {},
+    hasMoreCollections: Boolean = false,
+    onLoadMoreCollections: () -> Unit = {},
     onCreateCampaign: () -> Unit = {},
     onOfferClick: (AdOffer) -> Unit = {},
     onOfferPauseToggle: (AdOffer) -> Unit = {},
@@ -496,10 +518,25 @@ internal fun LazyListScope.personalRecsAndCollectionsSection(
 
         // ── Collections ───────────────────────────────────────────────────────
         1 -> {
-            if (collections.isEmpty()) {
+            // Показываем только root-коллекции (parentId == null)
+            val roots = collections.filter { it.parentId == null }
+            // Считаем количество детей для каждого root
+            val childCountByParent = collections
+                .mapNotNull { it.parentId }
+                .groupingBy { it }
+                .eachCount()
+
+            // Карточка "+ New collection" + root-коллекции в одной 2-колоночной сетке
+            // (только для владельца профиля)
+            val gridItems = buildList<CollectionGridItem> {
+                if (isViewerOwner) add(CollectionGridItem.AddNew)
+                addAll(roots.map { CollectionGridItem.Item(it) })
+            }
+
+            if (gridItems.isEmpty()) {
                 item { EmptyStateCard("No collections yet") }
             } else {
-                val rows = collections.chunked(2)
+                val rows = gridItems.chunked(2)
                 items(rows) { rowItems ->
                     Row(
                         modifier = Modifier
@@ -508,14 +545,55 @@ internal fun LazyListScope.personalRecsAndCollectionsSection(
                             .padding(bottom = 10.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        rowItems.forEach { col ->
-                            CollectionCard(
-                                collection = col,
-                                modifier = Modifier.weight(1f),
-                                onClick = { onCollectionClick(col) }
-                            )
+                        rowItems.forEach { item ->
+                            when (item) {
+                                CollectionGridItem.AddNew -> NewCollectionCard(
+                                    modifier = Modifier.weight(1f),
+                                    onClick = onCreateCollection
+                                )
+                                is CollectionGridItem.Item -> {
+                                    val coverPost = item.collection.coverPostId
+                                        ?.let { cid -> myPosts.find { it.id == cid } }
+                                    CollectionCard(
+                                        collection = item.collection,
+                                        coverImageUrl = coverPost?.imageUrl,
+                                        childCount = childCountByParent[item.collection.id] ?: 0,
+                                        modifier = Modifier.weight(1f),
+                                        onClick = { onCollectionClick(item.collection) }
+                                    )
+                                }
+                            }
                         }
                         if (rowItems.size == 1) Spacer(Modifier.weight(1f))
+                    }
+                }
+                // Load more button — показываем только если ViewModel сигналит, что есть ещё
+                if (hasMoreCollections && isViewerOwner) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp, vertical = 8.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(44.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .border(1.5.dp, AppViolet.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
+                                    .background(AppViolet.copy(alpha = 0.06f))
+                                    .clickable { onLoadMoreCollections() },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    "Load more",
+                                    fontFamily = HeadingFontFamily,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp,
+                                    color = AppViolet
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -842,10 +920,18 @@ fun PostSmallCard(post: Post, onClick: () -> Unit = {}) {
     }
 }
 
+// Sealed-тип для смешанной сетки коллекций (включая карточку "+ New collection")
+internal sealed interface CollectionGridItem {
+    data object AddNew : CollectionGridItem
+    data class Item(val collection: PostCollection) : CollectionGridItem
+}
+
 @Composable
 fun CollectionCard(
     collection: PostCollection,
     modifier: Modifier = Modifier,
+    childCount: Int = 0,
+    coverImageUrl: String? = null,
     onClick: () -> Unit
 ) {
     Surface(
@@ -856,35 +942,158 @@ fun CollectionCard(
             .clickable { onClick() }
             .aspectRatio(1f)
     ) {
+        if (!coverImageUrl.isNullOrBlank()) {
+            // Cover-режим: фото на весь фон + затемнение + текст внизу
+            Box(modifier = Modifier.fillMaxSize()) {
+                AsyncImage(
+                    model = coverImageUrl,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color.Transparent, Color(0xFF1A2A24).copy(alpha = 0.78f))
+                            )
+                        )
+                        .padding(horizontal = 12.dp, vertical = 10.dp)
+                ) {
+                    Column {
+                        Text(
+                            collection.name,
+                            fontFamily = HeadingFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
+                            color = AppWhite,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "${collection.postIds.size} picks",
+                                fontFamily = BodyFontFamily,
+                                fontSize = 11.sp,
+                                color = AppWhite.copy(alpha = 0.85f)
+                            )
+                            if (childCount > 0) {
+                                Text(
+                                    " · 📂 $childCount",
+                                    fontFamily = BodyFontFamily,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 11.sp,
+                                    color = AppWhite
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            // Дефолт: иконка + название + счётчик
+            Column(
+                modifier = Modifier.padding(14.dp),
+                horizontalAlignment = Alignment.Start,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(AppViolet.copy(alpha = 0.10f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Filled.Bookmarks, contentDescription = null, tint = AppViolet, modifier = Modifier.size(22.dp))
+                }
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    collection.name,
+                    fontFamily = HeadingFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    color = AppDark,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(top = 3.dp)
+                ) {
+                    Text(
+                        "${collection.postIds.size} picks",
+                        fontFamily = BodyFontFamily,
+                        fontSize = 12.sp,
+                        color = AppMuted
+                    )
+                    if (childCount > 0) {
+                        Text(
+                            " · 📂 $childCount",
+                            fontFamily = BodyFontFamily,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 12.sp,
+                            color = AppViolet
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun NewCollectionCard(
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = AppViolet.copy(alpha = 0.06f),
+        modifier = modifier
+            .clickable { onClick() }
+            .aspectRatio(1f)
+            .border(
+                width = 1.5.dp,
+                color = AppViolet.copy(alpha = 0.35f),
+                shape = RoundedCornerShape(16.dp)
+            )
+    ) {
         Column(
             modifier = Modifier.padding(14.dp),
-            horizontalAlignment = Alignment.Start,
+            horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
             Box(
                 modifier = Modifier
                     .size(44.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(AppViolet.copy(alpha = 0.10f)),
+                    .background(AppViolet.copy(alpha = 0.15f)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Filled.Bookmarks, contentDescription = null, tint = AppViolet, modifier = Modifier.size(22.dp))
+                Icon(
+                    Icons.Filled.Add,
+                    contentDescription = "New collection",
+                    tint = AppViolet,
+                    modifier = Modifier.size(24.dp)
+                )
             }
             Spacer(Modifier.height(10.dp))
             Text(
-                collection.name,
+                "New collection",
                 fontFamily = HeadingFontFamily,
                 fontWeight = FontWeight.Bold,
                 fontSize = 14.sp,
-                color = AppDark,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
+                color = AppViolet,
+                textAlign = TextAlign.Center,
+                maxLines = 1
             )
             Text(
-                "${collection.postIds.size} picks",
+                "Tap to create",
                 fontFamily = BodyFontFamily,
                 fontSize = 12.sp,
-                color = AppMuted,
+                color = AppViolet.copy(alpha = 0.65f),
                 modifier = Modifier.padding(top = 3.dp)
             )
         }

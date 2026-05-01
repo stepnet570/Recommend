@@ -21,6 +21,15 @@ class MainActivity : ComponentActivity() {
             )
         }
 
+        // Apply schema migrations / retroactive welcome bonus for the already-signed-in user.
+        // This guarantees that legacy accounts get hasSeenMonetizationOnboarding + welcome bonus
+        // on app launch — without forcing the user to sign out / sign in again.
+        FirebaseAuth.getInstance().currentUser?.let { user ->
+            FirebaseFirestore.getInstance().ensureUserProfileForAuthUser(user) {
+                Log.i("TrustListApp", "ensureUserProfile completed for uid=${user.uid}")
+            }
+        }
+
         setContent {
             RecommendTheme {
                 val currentUser = FirebaseAuth.getInstance().currentUser

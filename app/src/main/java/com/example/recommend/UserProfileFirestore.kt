@@ -13,7 +13,10 @@ import com.google.firebase.firestore.SetOptions
 private const val TAG = "UserProfileFirestore"
 
 /** Bump when schema defaults change so migration runs again for all users. */
-private const val USER_PROFILE_MIGRATION_VERSION = 3
+private const val USER_PROFILE_MIGRATION_VERSION = 4
+
+/** Welcome bonus given to every newly registered user, redeemable on first sponsored offer. */
+const val WELCOME_TRUST_COINS_BONUS = 50
 
 private fun migrationPrefsKey(): String = "user_profile_migration_v$USER_PROFILE_MIGRATION_VERSION"
 
@@ -51,8 +54,12 @@ fun buildUserProfileMapForEmailSignUp(
         "following" to emptyList<String>(),
         "trustScore" to 0.0,
         "isBusiness" to false,
+        // Welcome bonus is no longer granted at registration — it's now tied
+        // to switching to business mode (one-time, idempotent via welcomeBonusGranted).
         "trustCoins" to 0,
         "trustRatings" to hashMapOf<String, Any>(),
+        "hasSeenMonetizationOnboarding" to false,
+        "welcomeBonusGranted" to false,
         "email" to emailTrim,
         "createdAt" to System.currentTimeMillis()
     )
@@ -80,6 +87,8 @@ fun buildUserProfileMapFromFirebaseUser(user: FirebaseUser): HashMap<String, Any
         "isBusiness" to false,
         "trustCoins" to 0,
         "trustRatings" to hashMapOf<String, Any>(),
+        "hasSeenMonetizationOnboarding" to false,
+        "welcomeBonusGranted" to false,
         "email" to email,
         "createdAt" to System.currentTimeMillis()
     )
@@ -105,6 +114,8 @@ private fun defaultProfileMapFromSnapshot(snap: DocumentSnapshot): HashMap<Strin
         "isBusiness" to false,
         "trustCoins" to 0,
         "trustRatings" to hashMapOf<String, Any>(),
+        "hasSeenMonetizationOnboarding" to false,
+        "welcomeBonusGranted" to false,
         "email" to email,
         "createdAt" to (snap.getLong("createdAt") ?: System.currentTimeMillis())
     )
@@ -164,6 +175,24 @@ internal fun computeLegacyUserProfilePatches(snap: DocumentSnapshot, user: Fireb
             "address" to "",
             "businessAvatar" to ""
         )
+    }
+
+    when (snap.get("hasSeenMonetizationOnboarding")) {
+        is Boolean -> { /* ok */ }
+        else -> patches["hasSeenMonetizationOnboarding"] = false
+    }
+
+    // Welcome bonus is now business-tied (granted on first switchToBusiness).
+    // For legacy accounts: heuristic — if they already have >= 50 TC, treat as
+    // already-granted (probably got it from an earlier build); otherwise eligible.
+    when (snap.get("welcomeBonusGranted")) {
+        is Boolean -> { /* ok */ }
+        else -> {
+            val existingCoins = (snap.get("trustCoins") as? Number)?.toInt() ?: 0
+            val alreadyGranted = existingCoins >= WELCOME_TRUST_COINS_BONUS
+            patches["welcomeBonusGranted"] = alreadyGranted
+            Log.i(TAG, "Migrating welcomeBonusGranted=$alreadyGranted for uid=${snap.id} (coins=$existingCoins)")
+        }
     }
 
     return patches

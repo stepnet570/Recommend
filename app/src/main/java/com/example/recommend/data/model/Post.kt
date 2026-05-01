@@ -19,7 +19,9 @@ data class Post(
     /** Set when this post is a reply to a pack «signal» (request). */
     val replyToRequestId: String? = null,
     /** External link (e.g. website) for signal replies / picks. */
-    val resourceUrl: String? = null
+    val resourceUrl: String? = null,
+    /** Unix timestamp (ms) when the post was created — used for "X ago" display. */
+    val createdAt: Long = 0L
 )
 
 fun Post.averageAudienceRatingStars(): Int? {

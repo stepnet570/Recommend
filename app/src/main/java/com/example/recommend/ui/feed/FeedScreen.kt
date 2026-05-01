@@ -13,6 +13,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -27,6 +28,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -279,7 +281,12 @@ fun FeedScreen(
     viewerUid: String? = null,
     onAudienceRate: (String, Int) -> Unit = { _, _ -> },
     onOpenPost: ((String) -> Unit)? = null,
-    onWalletClick: () -> Unit = {}
+    onWalletClick: () -> Unit = {},
+    /** Manual trigger to re-open the monetization onboarding sheet (info icon next to coins). */
+    onCoinsHelpClick: () -> Unit = {},
+    isLoadingMore: Boolean = false,
+    canLoadMore: Boolean = true,
+    onLoadMore: () -> Unit = {}
 ) {
     var searchQuery by remember { mutableStateOf("") }
     val currentUserName = remember(viewerUid, users) {
@@ -318,8 +325,27 @@ fun FeedScreen(
         requests.filter { it.status.equals("active", ignoreCase = true) }
     }
 
+    val listState = rememberLazyListState()
+
+    // Trigger loadMore when the user is 3 items from the bottom
+    LaunchedEffect(listState, canLoadMore, isLoadingMore) {
+        snapshotFlow {
+            val info = listState.layoutInfo
+            val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: 0
+            val total = info.totalItemsCount
+            lastVisible to total
+        }
+            .distinctUntilChanged()
+            .collect { (lastVisible, total) ->
+                if (total > 0 && lastVisible >= total - 3 && canLoadMore && !isLoadingMore) {
+                    onLoadMore()
+                }
+            }
+    }
+
     Scaffold(containerColor = AppBackground) { paddingValues ->
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
@@ -331,7 +357,8 @@ fun FeedScreen(
                 FeedGreetingRow(
                     userName = currentUserName,
                     trustCoins = trustCoins,
-                    onWalletClick = onWalletClick
+                    onWalletClick = onWalletClick,
+                    onCoinsHelpClick = onCoinsHelpClick
                 )
             }
             item {
@@ -405,6 +432,30 @@ fun FeedScreen(
                         onAudienceRate = onAudienceRate,
                         onOpenPost = onOpenPost
                     )
+                }
+
+                // Pagination footer
+                item {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        when {
+                            isLoadingMore -> CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                color = AppViolet,
+                                strokeWidth = 2.5.dp
+                            )
+                            !canLoadMore -> Text(
+                                text = "You've seen everything 🐺",
+                                fontFamily = BodyFontFamily,
+                                fontSize = 13.sp,
+                                color = AppMuted
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -823,12 +874,13 @@ private fun PackPulseStoryItem(
     }
 }
 
-/** Greeting header row — "Good morning, [Name] 👋" + coins chip */
+/** Greeting header row — "Good morning, [Name] 👋" + coins chip + help (?) icon */
 @Composable
 private fun FeedGreetingRow(
     userName: String,
     trustCoins: Int,
-    onWalletClick: () -> Unit
+    onWalletClick: () -> Unit,
+    onCoinsHelpClick: () -> Unit = {}
 ) {
     Row(
         modifier = Modifier
@@ -854,36 +906,58 @@ private fun FeedGreetingRow(
             )
         }
 
-        // Coins chip
         Row(
-            modifier = Modifier
-                .clip(RoundedCornerShape(14.dp))
-                .background(AppGold.copy(alpha = 0.10f))
-                .clickable(onClick = onWalletClick)
-                .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Icon(
-                Icons.Filled.AccountBalanceWallet,
-                contentDescription = null,
-                tint = AppGold,
-                modifier = Modifier.size(18.dp)
-            )
-            Text(
-                text = trustCoins.toString(),
-                fontFamily = HeadingFontFamily,
-                fontWeight = FontWeight.Bold,
-                fontSize = 15.sp,
-                color = AppGold
-            )
-            Text(
-                text = "TC",
-                fontFamily = BodyFontFamily,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 11.sp,
-                color = AppGold.copy(alpha = 0.7f)
-            )
+            // Coins chip
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(AppGold.copy(alpha = 0.10f))
+                    .clickable(onClick = onWalletClick)
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    Icons.Filled.AccountBalanceWallet,
+                    contentDescription = null,
+                    tint = AppGold,
+                    modifier = Modifier.size(18.dp)
+                )
+                Text(
+                    text = trustCoins.toString(),
+                    fontFamily = HeadingFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    color = AppGold
+                )
+                Text(
+                    text = "TC",
+                    fontFamily = BodyFontFamily,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 11.sp,
+                    color = AppGold.copy(alpha = 0.7f)
+                )
+            }
+
+            // Help (?) icon — re-opens monetization onboarding
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(AppViolet.copy(alpha = 0.10f))
+                    .clickable(onClick = onCoinsHelpClick),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.HelpOutline,
+                    contentDescription = "How TrustCoins work",
+                    tint = AppViolet,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
         }
     }
 }

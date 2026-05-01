@@ -5,6 +5,7 @@ import com.example.recommend.trustListDataRoot
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -30,6 +31,24 @@ class CollectionRepository(private val db: FirebaseFirestore) {
     fun getCollectionsStream(uid: String): Flow<List<PostCollection>> = callbackFlow {
         val listener = collectionsRef()
             .whereEqualTo("userId", uid)
+            .addSnapshotListener { snapshot, _ ->
+                if (snapshot != null) {
+                    trySend(snapshot.documents.map { it.toPostCollection() })
+                }
+            }
+        awaitClose { listener.remove() }
+    }
+
+    /**
+     * Постранично загруженные коллекции пользователя.
+     * Сортировка по createdAt DESC, лимит управляется параметром.
+     * Используется для UI-пагинации с кнопкой "Load more" (увеличиваем [limit]).
+     */
+    fun getCollectionsStreamLimited(uid: String, limit: Long): Flow<List<PostCollection>> = callbackFlow {
+        val listener = collectionsRef()
+            .whereEqualTo("userId", uid)
+            .orderBy("createdAt", Query.Direction.DESCENDING)
+            .limit(limit)
             .addSnapshotListener { snapshot, _ ->
                 if (snapshot != null) {
                     trySend(snapshot.documents.map { it.toPostCollection() })
@@ -102,4 +121,35 @@ class CollectionRepository(private val db: FirebaseFirestore) {
                 .addOnSuccessListener { cont.resume(Unit) }
                 .addOnFailureListener { cont.resumeWithException(it) }
         }
+
+    /** Поставить пост обложкой коллекции. Передай null чтобы сбросить. */
+    suspend fun setCoverPost(collectionId: String, postId: String?): Unit =
+        suspendCancellableCoroutine { cont ->
+            collectionsRef().document(collectionId)
+                .update("coverPostId", postId)
+                .addOnSuccessListener { cont.resume(Unit) }
+                .addOnFailureListener { cont.resumeWithException(it) }
+        }
+
+    /**
+     * Атомарно переместить пост из одной коллекции в другую.
+     * Используем batch — гарантия что не получим "пост в обеих" или "ни в одной" при сбое сети.
+     */
+    suspend fun movePostBetweenCollections(
+        fromCollectionId: String,
+        toCollectionId: String,
+        postId: String
+    ): Unit = suspendCancellableCoroutine { cont ->
+        if (fromCollectionId == toCollectionId) {
+            cont.resume(Unit); return@suspendCancellableCoroutine
+        }
+        val batch = db.batch()
+        val from = collectionsRef().document(fromCollectionId)
+        val to = collectionsRef().document(toCollectionId)
+        batch.update(from, "postIds", FieldValue.arrayRemove(postId))
+        batch.update(to, "postIds", FieldValue.arrayUnion(postId))
+        batch.commit()
+            .addOnSuccessListener { cont.resume(Unit) }
+            .addOnFailureListener { cont.resumeWithException(it) }
+    }
 }

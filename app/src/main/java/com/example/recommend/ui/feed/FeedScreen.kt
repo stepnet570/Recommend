@@ -282,6 +282,8 @@ fun FeedScreen(
     onAudienceRate: (String, Int) -> Unit = { _, _ -> },
     onOpenPost: ((String) -> Unit)? = null,
     onWalletClick: () -> Unit = {},
+    /** Manual trigger to re-open the monetization onboarding sheet (info icon next to coins). */
+    onCoinsHelpClick: () -> Unit = {},
     isLoadingMore: Boolean = false,
     canLoadMore: Boolean = true,
     onLoadMore: () -> Unit = {}
@@ -355,7 +357,8 @@ fun FeedScreen(
                 FeedGreetingRow(
                     userName = currentUserName,
                     trustCoins = trustCoins,
-                    onWalletClick = onWalletClick
+                    onWalletClick = onWalletClick,
+                    onCoinsHelpClick = onCoinsHelpClick
                 )
             }
             item {
@@ -871,12 +874,13 @@ private fun PackPulseStoryItem(
     }
 }
 
-/** Greeting header row — "Good morning, [Name] 👋" + coins chip */
+/** Greeting header row — "Good morning, [Name] 👋" + coins chip + help (?) icon */
 @Composable
 private fun FeedGreetingRow(
     userName: String,
     trustCoins: Int,
-    onWalletClick: () -> Unit
+    onWalletClick: () -> Unit,
+    onCoinsHelpClick: () -> Unit = {}
 ) {
     Row(
         modifier = Modifier
@@ -902,36 +906,58 @@ private fun FeedGreetingRow(
             )
         }
 
-        // Coins chip
         Row(
-            modifier = Modifier
-                .clip(RoundedCornerShape(14.dp))
-                .background(AppGold.copy(alpha = 0.10f))
-                .clickable(onClick = onWalletClick)
-                .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Icon(
-                Icons.Filled.AccountBalanceWallet,
-                contentDescription = null,
-                tint = AppGold,
-                modifier = Modifier.size(18.dp)
-            )
-            Text(
-                text = trustCoins.toString(),
-                fontFamily = HeadingFontFamily,
-                fontWeight = FontWeight.Bold,
-                fontSize = 15.sp,
-                color = AppGold
-            )
-            Text(
-                text = "TC",
-                fontFamily = BodyFontFamily,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 11.sp,
-                color = AppGold.copy(alpha = 0.7f)
-            )
+            // Coins chip
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(AppGold.copy(alpha = 0.10f))
+                    .clickable(onClick = onWalletClick)
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    Icons.Filled.AccountBalanceWallet,
+                    contentDescription = null,
+                    tint = AppGold,
+                    modifier = Modifier.size(18.dp)
+                )
+                Text(
+                    text = trustCoins.toString(),
+                    fontFamily = HeadingFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 15.sp,
+                    color = AppGold
+                )
+                Text(
+                    text = "TC",
+                    fontFamily = BodyFontFamily,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 11.sp,
+                    color = AppGold.copy(alpha = 0.7f)
+                )
+            }
+
+            // Help (?) icon — re-opens monetization onboarding
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(AppViolet.copy(alpha = 0.10f))
+                    .clickable(onClick = onCoinsHelpClick),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Filled.HelpOutline,
+                    contentDescription = "How TrustCoins work",
+                    tint = AppViolet,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
         }
     }
 }

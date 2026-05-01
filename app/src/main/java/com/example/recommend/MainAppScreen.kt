@@ -62,6 +62,7 @@ fun MainAppScreen(onLogout: () -> Unit) {
 
     val myPosts by profileViewModel.myPosts.collectAsStateWithLifecycle()
     val userCollections by profileViewModel.userCollections.collectAsStateWithLifecycle()
+    val hasMoreCollections by profileViewModel.hasMoreCollections.collectAsStateWithLifecycle()
     val myOffers by profileViewModel.myOffers.collectAsStateWithLifecycle()
     val followersCount by profileViewModel.followersCount.collectAsStateWithLifecycle()
     val participatingCount by profileViewModel.participatingPromoCampaignsCount.collectAsStateWithLifecycle()
@@ -223,6 +224,8 @@ fun MainAppScreen(onLogout: () -> Unit) {
             feedOffersForHome = feedOffersForHome,
             myPosts = myPosts,
             userCollections = userCollections,
+            hasMoreCollections = hasMoreCollections,
+            onLoadMoreCollections = { profileViewModel.loadMoreCollections() },
             myOffers = myOffers,
             followersCount = followersCount,
             participatingPromoCampaignsCount = participatingCount,

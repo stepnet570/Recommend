@@ -1,11 +1,19 @@
 package com.example.recommend.navigation
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.ui.Alignment
+import com.example.recommend.ui.theme.AppBackground
+import com.example.recommend.ui.theme.AppTeal
 import androidx.compose.runtime.*
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -21,9 +29,12 @@ import com.example.recommend.data.model.*
 import com.example.recommend.ui.add.AddScreen
 import com.example.recommend.ui.explore.ExploreScreen
 import com.example.recommend.ui.feed.FeedScreen
+import com.example.recommend.ui.onboarding.MonetizationOnboardingSheet
+import com.example.recommend.ui.onboarding.SwitchToBusinessSheet
 import com.example.recommend.ui.profile.ProfileScreen
 import com.example.recommend.ui.theme.SoftPastelMint
 import com.example.recommend.data.repository.CollectionRepository
+import com.example.recommend.data.repository.UserRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
@@ -47,6 +58,8 @@ fun AppNavigation(
     // Profile state
     myPosts: List<Post>,
     userCollections: List<PostCollection>,
+    hasMoreCollections: Boolean = false,
+    onLoadMoreCollections: () -> Unit = {},
     myOffers: List<AdOffer>,
     followersCount: Int,
     participatingPromoCampaignsCount: Int,
@@ -62,6 +75,7 @@ fun AppNavigation(
     val db = FirebaseFirestore.getInstance()
     val currentUser = FirebaseAuth.getInstance().currentUser
     val collectionRepo = remember { CollectionRepository(db) }
+    val userRepo = remember { UserRepository(db) }
     val coroutineScope = rememberCoroutineScope()
 
     // --- overlay state ---
@@ -86,6 +100,11 @@ fun AppNavigation(
     var linkedOfferIdForAdd by remember { mutableStateOf<String?>(null) }
     var linkedOfferTitleForAdd by remember { mutableStateOf<String?>(null) }
     var activeOffer by remember { mutableStateOf<AdOffer?>(null) }
+    // Monetization onboarding overlay state (contextual: triggered by first deal tap)
+    var showMonetizationOnboarding by remember { mutableStateOf(false) }
+    var pendingOfferAfterOnboarding by remember { mutableStateOf<AdOffer?>(null) }
+    // Switch-to-business overlay (triggered from AddHubScreen footnote)
+    var showSwitchToBusiness by remember { mutableStateOf(false) }
     var addPickForRequestId by remember { mutableStateOf<String?>(null) }
     var selectedOfferId by remember { mutableStateOf<String?>(null) }
     var profileOfferCache by remember { mutableStateOf<AdOffer?>(null) }
@@ -162,13 +181,16 @@ fun AppNavigation(
     }
 
     Box(modifier = modifier.fillMaxSize()) {
+        // Instagram-style tab switching:
+        // — no slide / scale (kills the "crawl from corner" artifact)
+        // — short cross-fade (120ms) keeps the transition feeling intentional but instant
         NavHost(
             navController = navController,
             startDestination = "feed",
-            enterTransition = { EnterTransition.None },
-            exitTransition = { ExitTransition.None },
-            popEnterTransition = { EnterTransition.None },
-            popExitTransition = { ExitTransition.None }
+            enterTransition = { fadeIn(animationSpec = tween(120)) },
+            exitTransition = { fadeOut(animationSpec = tween(120)) },
+            popEnterTransition = { fadeIn(animationSpec = tween(120)) },
+            popExitTransition = { fadeOut(animationSpec = tween(120)) }
         ) {
 
             composable("feed") {
@@ -185,7 +207,14 @@ fun AppNavigation(
                     activeOffers = feedOffersForHome,
                     acceptedOfferIds = acceptedOfferIds,
                     trustCoins = currentUserProfile?.trustCoins ?: 0,
-                    onOfferClick = { offer -> activeOffer = offer },
+                    onOfferClick = { offer ->
+                        if (currentUserProfile?.hasSeenMonetizationOnboarding == false) {
+                            pendingOfferAfterOnboarding = offer
+                            showMonetizationOnboarding = true
+                        } else {
+                            activeOffer = offer
+                        }
+                    },
                     onUserClick = { uid -> viewUserProfileId = uid },
                     onAskPackClick = { onAskModalOpenChange(true) },
                     onRequestClick = { selectedRequest -> activeRequest = selectedRequest },
@@ -198,6 +227,12 @@ fun AppNavigation(
                     onAudienceRate = { postId, stars -> ratePost(postId, stars) },
                     onOpenPost = { openPostId = it },
                     onWalletClick = { navController.navigate("profile") },
+                    onCoinsHelpClick = {
+                        // Manual re-open of the monetization onboarding (info icon).
+                        // No pending offer — user just wants to re-read.
+                        pendingOfferAfterOnboarding = null
+                        showMonetizationOnboarding = true
+                    },
                     isLoadingMore = isLoadingMore,
                     canLoadMore = canLoadMore,
                     onLoadMore = onLoadMore
@@ -282,7 +317,8 @@ fun AppNavigation(
                         AddHubScreen(
                             isBusiness = false,
                             onPost = { userInAddForm = true },
-                            onAskPack = { onAskModalOpenChange(true) }
+                            onAskPack = { onAskModalOpenChange(true) },
+                            onSwitchToBusiness = { showSwitchToBusiness = true }
                         )
                     }
                 }
@@ -305,12 +341,28 @@ fun AppNavigation(
                             parentNameForNewCollection = null
                             creatingCollection = true
                         },
+                        hasMoreCollections = hasMoreCollections,
+                        onLoadMoreCollections = onLoadMoreCollections,
                         onPostClick = { openPostId = it },
                         onCreateCampaign = { createCampaignOverlay = true },
                         onOfferClick = { selectedOfferId = it.id },
                         onOfferPauseToggle = { toggleOfferPause(it) },
-                        onLogout = onLogout
+                        onLogout = onLogout,
+                        onSwitchToPersonal = {
+                            currentUser?.uid?.let { uid -> userRepo.switchToPersonal(uid) }
+                        }
                     )
+                } else {
+                    // Profile data still loading (e.g. right after switching account).
+                    // Render a centered spinner instead of a blank white screen.
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(AppBackground),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = AppTeal)
+                    }
                 }
             }
         }
@@ -415,6 +467,28 @@ fun AppNavigation(
                     }
                     // Закрываем удалённую коллекцию (popим из стека)
                     collectionStack = collectionStack.dropLast(1)
+                },
+                allCollections = userCollections,
+                onSetCover = { postId ->
+                    coroutineScope.launch {
+                        runCatching { collectionRepo.setCoverPost(liveCollection.id, postId) }
+                    }
+                },
+                onMovePost = { postId, destinationId ->
+                    coroutineScope.launch {
+                        runCatching {
+                            collectionRepo.movePostBetweenCollections(
+                                fromCollectionId = liveCollection.id,
+                                toCollectionId = destinationId,
+                                postId = postId
+                            )
+                        }
+                    }
+                },
+                onRemovePost = { postId ->
+                    coroutineScope.launch {
+                        runCatching { collectionRepo.removePostFromCollection(liveCollection.id, postId) }
+                    }
                 }
             )
         }
@@ -532,6 +606,61 @@ fun AppNavigation(
                         userInAddForm = true
                     }
                     navController.navigate("add") { launchSingleTop = true }
+                }
+            )
+        }
+
+        // Switch to Business — modal form that promotes the personal account.
+        // After confirm, currentUserProfile.isBusiness flips → AddHubScreen re-renders
+        // as "Grow your brand" automatically (reactive via getUserStream).
+        // After the success phase, the user picks: create first campaign or browse deals.
+        if (showSwitchToBusiness && currentUser != null) {
+            SwitchToBusinessSheet(
+                welcomeBonusAlreadyGranted = currentUserProfile?.welcomeBonusGranted == true,
+                onDismiss = { showSwitchToBusiness = false },
+                onConfirm = { businessData ->
+                    // Fire-and-forget: transaction handles bonus + isBusiness atomically.
+                    userRepo.switchToBusiness(currentUser.uid, businessData)
+                    // Sheet stays open and transitions to its internal success page.
+                },
+                onCreateCampaignClick = {
+                    showSwitchToBusiness = false
+                    // Land directly on the campaign creation screen inside the Add tab.
+                    businessAddDestination = BusinessAddDestination.Campaign
+                    navController.navigate("add") { launchSingleTop = true }
+                },
+                onBrowseDealsClick = {
+                    showSwitchToBusiness = false
+                    navController.navigate("feed") { launchSingleTop = true }
+                }
+            )
+        }
+
+        // Monetization onboarding — shown on the first tap on a Deal card,
+        // or manually via the help button next to the TrustCoins chip.
+        //
+        // "Seen" flag is set ONLY when the user reaches the final CTA — closing early
+        // (skip / swipe-down) keeps the flag false so they can come back to it later.
+        // The manual help button always opens the sheet regardless of the flag.
+        if (showMonetizationOnboarding && currentUser != null) {
+            MonetizationOnboardingSheet(
+                userTrustScore = currentUserProfile?.trustScore ?: 0.0,
+                requiredTrustScore = 3.0,
+                welcomeCoins = WELCOME_TRUST_COINS_BONUS,
+                onDismiss = {
+                    // Skip / swipe — DON'T persist seen, DON'T auto-open the pending offer.
+                    showMonetizationOnboarding = false
+                    pendingOfferAfterOnboarding = null
+                },
+                onSeeOffers = {
+                    // Full completion — persist seen and continue to the originally tapped offer.
+                    showMonetizationOnboarding = false
+                    userRepo.markMonetizationOnboardingSeen(currentUser.uid)
+                    val pending = pendingOfferAfterOnboarding
+                    pendingOfferAfterOnboarding = null
+                    if (pending != null) {
+                        activeOffer = pending
+                    }
                 }
             )
         }

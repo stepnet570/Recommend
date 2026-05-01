@@ -72,13 +72,17 @@ fun ProfileScreen(
     onProfileSurfaceChange: (Int) -> Unit = {},
     onCollectionClick: (PostCollection) -> Unit = {},
     onCreateCollection: () -> Unit = {},
+    hasMoreCollections: Boolean = false,
+    onLoadMoreCollections: () -> Unit = {},
     onPostClick: (String) -> Unit = {},
     onCreateCampaign: () -> Unit = {},
     onOfferClick: (AdOffer) -> Unit = {},
     onOfferPauseToggle: (AdOffer) -> Unit = {},
     isViewingOtherUser: Boolean = false,
     onBack: (() -> Unit)? = null,
-    onLogout: () -> Unit = {}
+    onLogout: () -> Unit = {},
+    /** Reverse switch — only shown when userProfile.isBusiness == true. */
+    onSwitchToPersonal: () -> Unit = {}
 ) {
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     var isAvatarUploading by remember { mutableStateOf(false) }
@@ -318,6 +322,16 @@ fun ProfileScreen(
                     }
                 }
 
+                // Switch back to personal (business accounts only)
+                if (!isViewingOtherUser && userProfile.isBusiness) {
+                    ProfileOutlinedButton(
+                        text = "Switch to personal account",
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                    ) {
+                        onSwitchToPersonal()
+                    }
+                }
+
                 // Logout button (own profile only)
                 if (!isViewingOtherUser) {
                     ProfileOutlinedButton(
@@ -343,6 +357,8 @@ fun ProfileScreen(
             onPostClick = onPostClick,
             onCollectionClick = onCollectionClick,
             onCreateCollection = onCreateCollection,
+            hasMoreCollections = hasMoreCollections,
+            onLoadMoreCollections = onLoadMoreCollections,
             onCreateCampaign = onCreateCampaign,
             onOfferClick = onOfferClick,
             onOfferPauseToggle = onOfferPauseToggle,
@@ -417,6 +433,8 @@ internal fun LazyListScope.personalRecsAndCollectionsSection(
     onPostClick: (String) -> Unit,
     onCollectionClick: (PostCollection) -> Unit,
     onCreateCollection: () -> Unit = {},
+    hasMoreCollections: Boolean = false,
+    onLoadMoreCollections: () -> Unit = {},
     onCreateCampaign: () -> Unit = {},
     onOfferClick: (AdOffer) -> Unit = {},
     onOfferPauseToggle: (AdOffer) -> Unit = {},
@@ -533,15 +551,49 @@ internal fun LazyListScope.personalRecsAndCollectionsSection(
                                     modifier = Modifier.weight(1f),
                                     onClick = onCreateCollection
                                 )
-                                is CollectionGridItem.Item -> CollectionCard(
-                                    collection = item.collection,
-                                    childCount = childCountByParent[item.collection.id] ?: 0,
-                                    modifier = Modifier.weight(1f),
-                                    onClick = { onCollectionClick(item.collection) }
-                                )
+                                is CollectionGridItem.Item -> {
+                                    val coverPost = item.collection.coverPostId
+                                        ?.let { cid -> myPosts.find { it.id == cid } }
+                                    CollectionCard(
+                                        collection = item.collection,
+                                        coverImageUrl = coverPost?.imageUrl,
+                                        childCount = childCountByParent[item.collection.id] ?: 0,
+                                        modifier = Modifier.weight(1f),
+                                        onClick = { onCollectionClick(item.collection) }
+                                    )
+                                }
                             }
                         }
                         if (rowItems.size == 1) Spacer(Modifier.weight(1f))
+                    }
+                }
+                // Load more button — показываем только если ViewModel сигналит, что есть ещё
+                if (hasMoreCollections && isViewerOwner) {
+                    item {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp, vertical = 8.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(44.dp)
+                                    .clip(RoundedCornerShape(14.dp))
+                                    .border(1.5.dp, AppViolet.copy(alpha = 0.35f), RoundedCornerShape(14.dp))
+                                    .background(AppViolet.copy(alpha = 0.06f))
+                                    .clickable { onLoadMoreCollections() },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    "Load more",
+                                    fontFamily = HeadingFontFamily,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp,
+                                    color = AppViolet
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -879,6 +931,7 @@ fun CollectionCard(
     collection: PostCollection,
     modifier: Modifier = Modifier,
     childCount: Int = 0,
+    coverImageUrl: String? = null,
     onClick: () -> Unit
 ) {
     Surface(
@@ -889,48 +942,101 @@ fun CollectionCard(
             .clickable { onClick() }
             .aspectRatio(1f)
     ) {
-        Column(
-            modifier = Modifier.padding(14.dp),
-            horizontalAlignment = Alignment.Start,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(AppViolet.copy(alpha = 0.10f)),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(Icons.Filled.Bookmarks, contentDescription = null, tint = AppViolet, modifier = Modifier.size(22.dp))
-            }
-            Spacer(Modifier.height(10.dp))
-            Text(
-                collection.name,
-                fontFamily = HeadingFontFamily,
-                fontWeight = FontWeight.Bold,
-                fontSize = 14.sp,
-                color = AppDark,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(top = 3.dp)
-            ) {
-                Text(
-                    "${collection.postIds.size} picks",
-                    fontFamily = BodyFontFamily,
-                    fontSize = 12.sp,
-                    color = AppMuted
+        if (!coverImageUrl.isNullOrBlank()) {
+            // Cover-режим: фото на весь фон + затемнение + текст внизу
+            Box(modifier = Modifier.fillMaxSize()) {
+                AsyncImage(
+                    model = coverImageUrl,
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
                 )
-                if (childCount > 0) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .fillMaxWidth()
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color.Transparent, Color(0xFF1A2A24).copy(alpha = 0.78f))
+                            )
+                        )
+                        .padding(horizontal = 12.dp, vertical = 10.dp)
+                ) {
+                    Column {
+                        Text(
+                            collection.name,
+                            fontFamily = HeadingFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
+                            color = AppWhite,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                "${collection.postIds.size} picks",
+                                fontFamily = BodyFontFamily,
+                                fontSize = 11.sp,
+                                color = AppWhite.copy(alpha = 0.85f)
+                            )
+                            if (childCount > 0) {
+                                Text(
+                                    " · 📂 $childCount",
+                                    fontFamily = BodyFontFamily,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 11.sp,
+                                    color = AppWhite
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            // Дефолт: иконка + название + счётчик
+            Column(
+                modifier = Modifier.padding(14.dp),
+                horizontalAlignment = Alignment.Start,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(AppViolet.copy(alpha = 0.10f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Filled.Bookmarks, contentDescription = null, tint = AppViolet, modifier = Modifier.size(22.dp))
+                }
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    collection.name,
+                    fontFamily = HeadingFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    color = AppDark,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(top = 3.dp)
+                ) {
                     Text(
-                        " · 📂 $childCount",
+                        "${collection.postIds.size} picks",
                         fontFamily = BodyFontFamily,
-                        fontWeight = FontWeight.SemiBold,
                         fontSize = 12.sp,
-                        color = AppViolet
+                        color = AppMuted
                     )
+                    if (childCount > 0) {
+                        Text(
+                            " · 📂 $childCount",
+                            fontFamily = BodyFontFamily,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 12.sp,
+                            color = AppViolet
+                        )
+                    }
                 }
             }
         }

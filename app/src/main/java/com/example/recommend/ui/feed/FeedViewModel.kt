@@ -1,5 +1,6 @@
 package com.example.recommend.ui.feed
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.recommend.data.model.AdOffer
@@ -14,6 +15,7 @@ import com.example.recommend.data.repository.RequestRepository
 import com.example.recommend.data.repository.UserRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -86,26 +88,31 @@ class FeedViewModel : ViewModel() {
     /**
      * Feed posts:
      * — real-time first page (_posts) + paginated older posts (_olderPosts), deduplicated
-     * — only from following + own posts (cold-start fallback: show all)
+     * — only from following + own posts
      * — no replies to requests (replyToRequestId must be blank)
+     *
+     * Fallback (show ALL posts) triggers when:
+     *   • user follows nobody yet (cold start), OR
+     *   • the filtered pack feed is empty (e.g. just followed someone with no posts —
+     *     better to show the world than a blank screen).
      */
     val feedPostsForHome: StateFlow<List<Post>> =
         combine(_posts, _olderPosts, _currentUser) { live, older, currentUser ->
             // Merge: live page takes precedence; older pages fill in the rest
             val liveIds = live.map { it.id }.toSet()
             val allPosts = live + older.filter { it.id !in liveIds }
+            val nonReplyPosts = allPosts.filter { it.replyToRequestId.isNullOrBlank() }
 
             val uid = currentUser?.uid
             val following = currentUser?.following?.toSet() ?: emptySet()
-            val filtered = allPosts.filter { post ->
-                post.replyToRequestId.isNullOrBlank() &&
-                (post.userId == uid || following.contains(post.userId))
+            val filtered = nonReplyPosts.filter { post ->
+                post.userId == uid || following.contains(post.userId)
             }
-            // Cold start: if not following anyone yet — show everyone
-            if (following.isEmpty()) {
-                allPosts.filter { it.replyToRequestId.isNullOrBlank() }
-            } else {
-                filtered
+
+            when {
+                following.isEmpty() -> nonReplyPosts        // cold start
+                filtered.isEmpty() -> nonReplyPosts         // pack is silent — fall back
+                else -> filtered                            // pack has posts
             }
         }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
@@ -150,20 +157,72 @@ class FeedViewModel : ViewModel() {
         }
     }
 
+    /** Jobs scoped to the currently authenticated user — cancelled on auth change. */
+    private val perUserJobs = mutableListOf<Job>()
+    private var lastBoundUid: String? = null
+
+    private val authListener = FirebaseAuth.AuthStateListener { fb ->
+        val newUid = fb.currentUser?.uid
+        if (newUid == lastBoundUid) return@AuthStateListener
+        Log.i("FeedViewModel", "Auth state changed: $lastBoundUid -> $newUid, rebinding streams")
+        lastBoundUid = newUid
+        // Cancel everything tied to the previous user
+        perUserJobs.forEach { it.cancel() }
+        perUserJobs.clear()
+        // Reset state so the UI doesn't briefly show data from the old account
+        _currentUser.value = null
+        _posts.value = emptyList()
+        _olderPosts.value = emptyList()
+        _allRequests.value = emptyList()
+        _collections.value = emptyList()
+        _activeOffers.value = emptyList()
+        if (newUid != null) {
+            bindStreamsForUser(newUid)
+        }
+    }
+
+    private fun bindStreamsForUser(uid: String) {
+        perUserJobs += viewModelScope.launch {
+            postRepo.getPostsStream().collect {
+                _posts.value = it
+                _isLoading.value = false
+            }
+        }
+        perUserJobs += viewModelScope.launch {
+            userRepo.getUserStream(uid).collect { _currentUser.value = it }
+        }
+        perUserJobs += viewModelScope.launch {
+            userRepo.getAllUsersStream().collect { _allUsers.value = it }
+        }
+        perUserJobs += viewModelScope.launch {
+            requestRepo.getRequestsStream().collect { _allRequests.value = it }
+        }
+        perUserJobs += viewModelScope.launch {
+            collectionRepo.getCollectionsStream(uid).collect { _collections.value = it }
+        }
+        perUserJobs += viewModelScope.launch {
+            offerRepo.getActiveOffers().collect { _activeOffers.value = it }
+        }
+    }
+
     init {
+        // Initial binding (if a user is already authenticated when ViewModel is created).
         val uid = currentUid
         if (uid != null) {
-            viewModelScope.launch {
-                postRepo.getPostsStream().collect {
-                    _posts.value = it
-                    _isLoading.value = false
-                }
-            }
-            viewModelScope.launch { userRepo.getUserStream(uid).collect { _currentUser.value = it } }
-            viewModelScope.launch { userRepo.getAllUsersStream().collect { _allUsers.value = it } }
-            viewModelScope.launch { requestRepo.getRequestsStream().collect { _allRequests.value = it } }
-            viewModelScope.launch { collectionRepo.getCollectionsStream(uid).collect { _collections.value = it } }
-            viewModelScope.launch { offerRepo.getActiveOffers().collect { _activeOffers.value = it } }
+            lastBoundUid = uid
+            bindStreamsForUser(uid)
+        } else {
+            _isLoading.value = false
         }
+        // Track future auth changes (login / logout / account switch) without
+        // depending on Activity recreation. Otherwise streams stay tied to the
+        // previous account and the new user's data never loads (blank screen for
+        // tens of seconds until something else recomposes).
+        auth.addAuthStateListener(authListener)
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        auth.removeAuthStateListener(authListener)
     }
 }

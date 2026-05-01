@@ -4,9 +4,11 @@ import com.example.recommend.ui.theme.*
 import com.example.recommend.data.model.*
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -54,13 +56,20 @@ fun CollectionDetailScreen(
     onSubCollectionClick: (PostCollection) -> Unit = {},
     onAddPost: () -> Unit = {},
     onRename: (newName: String) -> Unit = {},
-    onDelete: () -> Unit = {}
+    onDelete: () -> Unit = {},
+    // Tech-debt closure: drag-and-drop замещён long-press → action sheet.
+    allCollections: List<PostCollection> = emptyList(),
+    onSetCover: (postId: String?) -> Unit = {},
+    onMovePost: (postId: String, toCollectionId: String) -> Unit = { _, _ -> },
+    onRemovePost: (postId: String) -> Unit = {}
 ) {
     BackHandler { onBack() }
     var menuOpen by remember { mutableStateOf(false) }
     var moreOpen by remember { mutableStateOf(false) }
     var showRenameDialog by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var actionsForPostId by remember { mutableStateOf<String?>(null) }
+    var movePostId by remember { mutableStateOf<String?>(null) }
     // Скрываем "New sub-collection" если уже глубоко (parentId != null = это сама подколлекция)
     val isAlreadySubCollection = collection.parentId != null
 
@@ -176,6 +185,45 @@ fun CollectionDetailScreen(
                 }
             )
         }
+        // Long-press на пост → action sheet
+        actionsForPostId?.let { pid ->
+            val targetPost = posts.find { it.id == pid }
+            if (targetPost != null) {
+                CollectionPostActionsSheet(
+                    postTitle = targetPost.title,
+                    isCurrentCover = (collection.coverPostId == pid),
+                    onDismiss = { actionsForPostId = null },
+                    onSetAsCover = {
+                        onSetCover(pid)
+                        actionsForPostId = null
+                    },
+                    onClearCover = {
+                        onSetCover(null)
+                        actionsForPostId = null
+                    },
+                    onMove = {
+                        movePostId = pid
+                        actionsForPostId = null
+                    },
+                    onRemove = {
+                        onRemovePost(pid)
+                        actionsForPostId = null
+                    }
+                )
+            }
+        }
+        // Move-to picker
+        movePostId?.let { pid ->
+            MoveToCollectionSheet(
+                allCollections = allCollections,
+                currentCollectionId = collection.id,
+                onDismiss = { movePostId = null },
+                onPick = { destinationId ->
+                    onMovePost(pid, destinationId)
+                    movePostId = null
+                }
+            )
+        }
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
@@ -238,7 +286,14 @@ fun CollectionDetailScreen(
                         )
 
                         // ── Cover mosaic ──────────────────────────────────
+                        // Если задана обложка — она становится главной плиткой (flex:2),
+                        // остальные посты идут в боковой колонке.
                         if (posts.isNotEmpty()) {
+                            val coverPost = collection.coverPostId
+                                ?.let { id -> posts.find { it.id == id } }
+                            val mainPost = coverPost ?: posts.firstOrNull()
+                            val sidePosts = posts.filter { it.id != mainPost?.id }
+
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -247,7 +302,6 @@ fun CollectionDetailScreen(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 // Main tile (flex: 2)
-                                val mainPost = posts.firstOrNull()
                                 CollectionCoverTile(
                                     post = mainPost,
                                     modifier = Modifier
@@ -257,7 +311,7 @@ fun CollectionDetailScreen(
                                 )
 
                                 // Side column (flex: 1)
-                                if (posts.size > 1) {
+                                if (sidePosts.isNotEmpty()) {
                                     Column(
                                         modifier = Modifier
                                             .weight(1f)
@@ -265,15 +319,15 @@ fun CollectionDetailScreen(
                                         verticalArrangement = Arrangement.spacedBy(6.dp)
                                     ) {
                                         CollectionCoverTile(
-                                            post = posts.getOrNull(1),
+                                            post = sidePosts.getOrNull(0),
                                             modifier = Modifier
                                                 .weight(1f)
                                                 .fillMaxWidth(),
                                             emojiSize = 24.sp
                                         )
-                                        if (posts.size > 2) {
+                                        if (sidePosts.size > 1) {
                                             CollectionCoverTile(
-                                                post = posts.getOrNull(2),
+                                                post = sidePosts.getOrNull(1),
                                                 modifier = Modifier
                                                     .weight(1f)
                                                     .fillMaxWidth(),
@@ -359,7 +413,11 @@ fun CollectionDetailScreen(
                 items(posts, key = { it.id }) { post ->
                     CollectionPostItem(
                         post = post,
+                        isCover = post.id == collection.coverPostId,
                         onClick = { onOpenPost?.invoke(post.id) },
+                        onLongClick = if (canEdit) {
+                            { actionsForPostId = post.id }
+                        } else null,
                         modifier = Modifier
                             .padding(horizontal = 16.dp)
                             .padding(bottom = 10.dp)
@@ -402,10 +460,13 @@ private fun CollectionCoverTile(
 
 // ── Compact post item ─────────────────────────────────────────────────────────
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun CollectionPostItem(
     post: Post,
     onClick: () -> Unit,
+    isCover: Boolean = false,
+    onLongClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val trustScore = remember(post.ratingsByUser) {
@@ -418,7 +479,10 @@ private fun CollectionPostItem(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .clickable { onClick() },
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            ),
         shape = RoundedCornerShape(20.dp),
         color = AppWhite,
         shadowElevation = 2.dp
@@ -470,8 +534,21 @@ private fun CollectionPostItem(
                 }
             }
 
-            // TrustScore ring
-            TrustScoreRing(score = trustScore, size = 36.dp, strokeWidth = 3.5.dp)
+            // Cover badge — звёздочка справа над рингом, если этот пост — обложка
+            if (isCover) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(AppGold.copy(alpha = 0.14f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("★", fontSize = 18.sp, color = AppGold)
+                }
+            } else {
+                // TrustScore ring
+                TrustScoreRing(score = trustScore, size = 36.dp, strokeWidth = 3.5.dp)
+            }
         }
     }
 }

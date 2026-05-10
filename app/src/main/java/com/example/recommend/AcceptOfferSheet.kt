@@ -17,6 +17,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.recommend.data.AcceptOfferResult
+import com.example.recommend.data.TaskWatchdog
 import com.example.recommend.data.acceptOffer
 import com.example.recommend.data.model.AdOffer
 import com.example.recommend.ui.theme.*
@@ -280,7 +281,16 @@ fun AcceptOfferSheet(
                         .clickable(enabled = !isLoading) {
                             isLoading = true
                             errorMessage = null
+                            // BUG-013 fix: acceptOffer uses runTransaction which REQUIRES
+                            // network — unlike .add()/.update(), it can't be queued offline.
+                            // If it hangs (no connectivity), we surface a clear error
+                            // instead of leaving the loader spinning forever.
+                            val watchdog = TaskWatchdog.start(timeoutMs = 12_000L) {
+                                isLoading = false
+                                errorMessage = "Network is slow. Please try again."
+                            }
                             acceptOffer(db, offer, viewerUid) { result ->
+                                if (!watchdog.cancel()) return@acceptOffer
                                 isLoading = false
                                 when (result) {
                                     is AcceptOfferResult.Success ->

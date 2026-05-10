@@ -317,8 +317,7 @@ fun AppNavigation(
                         AddHubScreen(
                             isBusiness = false,
                             onPost = { userInAddForm = true },
-                            onAskPack = { onAskModalOpenChange(true) },
-                            onSwitchToBusiness = { showSwitchToBusiness = true }
+                            onAskPack = { onAskModalOpenChange(true) }
                         )
                     }
                 }
@@ -350,7 +349,8 @@ fun AppNavigation(
                         onLogout = onLogout,
                         onSwitchToPersonal = {
                             currentUser?.uid?.let { uid -> userRepo.switchToPersonal(uid) }
-                        }
+                        },
+                        onSwitchToBusiness = { showSwitchToBusiness = true }
                     )
                 } else {
                     // Profile data still loading (e.g. right after switching account).

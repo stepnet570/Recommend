@@ -78,6 +78,18 @@ fun AddScreen(
 
     val categories = PostCategory.all
 
+    // BUG-008 fix: Firestore add()/update() can hang forever on flaky networks
+    // because they wait for SERVER ack. We need a watchdog so the UI loader
+    // always clears within a bounded time. Firestore writes the doc to the
+    // offline cache synchronously, so closing the screen is safe — the data
+    // will sync when the network returns.
+    fun finishUpload(message: String) {
+        if (!isUploading) return  // already done — avoid double-close
+        isUploading = false
+        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        onPostAdded()
+    }
+
     fun writePostDocument(imageUrl: String?) {
         val currentUser = auth.currentUser
         val authorName = currentUserProfile?.name?.takeIf { it.isNotBlank() }
@@ -102,30 +114,42 @@ fun AddScreen(
             postData["offerId"] = offerId
         }
 
+        // Watchdog: if neither success nor failure listener fires within 8s
+        // (server ack pending on bad network), close the loader and let the
+        // user move on. Firestore retains the write in its offline queue.
+        val watchdog = Runnable {
+            finishUpload("Saved. Will publish when you're back online.")
+        }
+        mainHandler.postDelayed(watchdog, 8_000L)
+
         db.trustListDataRoot()
             .collection("posts")
             .add(postData)
             .addOnSuccessListener { ref ->
+                mainHandler.removeCallbacks(watchdog)
                 val newPostId = ref.id
                 val collectionId = targetCollectionId
                 if (!collectionId.isNullOrBlank()) {
-                    // Сразу кладём пост в указанную коллекцию.
+                    // Add post to the chosen collection — also bounded by a watchdog.
+                    val collectionWatchdog = Runnable {
+                        finishUpload("Added. Collection will sync when you're back online.")
+                    }
+                    mainHandler.postDelayed(collectionWatchdog, 6_000L)
                     db.trustListDataRoot()
                         .collection("collections")
                         .document(collectionId)
                         .update("postIds", com.google.firebase.firestore.FieldValue.arrayUnion(newPostId))
                         .addOnCompleteListener {
-                            isUploading = false
-                            Toast.makeText(context, "Added to collection!", Toast.LENGTH_SHORT).show()
-                            onPostAdded()
+                            mainHandler.removeCallbacks(collectionWatchdog)
+                            finishUpload("Added to collection!")
                         }
                 } else {
-                    isUploading = false
-                    Toast.makeText(context, "Recommendation published!", Toast.LENGTH_SHORT).show()
-                    onPostAdded()
+                    finishUpload("Recommendation published!")
                 }
             }
             .addOnFailureListener { e ->
+                mainHandler.removeCallbacks(watchdog)
+                if (!isUploading) return@addOnFailureListener
                 isUploading = false
                 Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
             }
@@ -155,13 +179,35 @@ fun AddScreen(
                 val path = "posts/${currentUser.uid}/${System.currentTimeMillis()}.jpg"
                 val ref = storage.reference.child(path)
                 val metadata = StorageMetadata.Builder().setContentType("image/jpeg").build()
+
+                // BUG-009 fix: Storage upload is the slowest step and the most
+                // likely to hang on bad networks. Hard-cap at 25s — if photo
+                // upload doesn't complete by then, fall back to publishing the
+                // post WITHOUT a photo so the user isn't stuck.
+                val storageDone = java.util.concurrent.atomic.AtomicBoolean(false)
+                val storageWatchdog = Runnable {
+                    if (storageDone.compareAndSet(false, true)) {
+                        Toast.makeText(
+                            context,
+                            "Photo upload is slow — publishing without photo.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                        writePostDocument(null)
+                    }
+                }
+                mainHandler.postDelayed(storageWatchdog, 25_000L)
+
                 ref.putBytes(bytes, metadata)
                     .addOnSuccessListener {
                         ref.downloadUrl
                             .addOnSuccessListener { download ->
+                                if (!storageDone.compareAndSet(false, true)) return@addOnSuccessListener
+                                mainHandler.removeCallbacks(storageWatchdog)
                                 mainHandler.post { writePostDocument(download.toString()) }
                             }
                             .addOnFailureListener { e ->
+                                if (!storageDone.compareAndSet(false, true)) return@addOnFailureListener
+                                mainHandler.removeCallbacks(storageWatchdog)
                                 mainHandler.post {
                                     isUploading = false
                                     Toast.makeText(context, "Photo URL: ${e.message}", Toast.LENGTH_SHORT).show()
@@ -169,6 +215,8 @@ fun AddScreen(
                             }
                     }
                     .addOnFailureListener { e ->
+                        if (!storageDone.compareAndSet(false, true)) return@addOnFailureListener
+                        mainHandler.removeCallbacks(storageWatchdog)
                         mainHandler.post {
                             isUploading = false
                             Toast.makeText(context, "Upload failed: ${e.message}", Toast.LENGTH_SHORT).show()

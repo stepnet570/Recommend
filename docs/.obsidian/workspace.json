@@ -1,0 +1,232 @@
+{
+  "main": {
+    "id": "8a7cde9cf2a922a0",
+    "type": "split",
+    "children": [
+      {
+        "id": "1f8720db9e63f28d",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "4333f5250e0a4925",
+            "type": "leaf",
+            "state": {
+              "type": "canvas",
+              "state": {
+                "file": "Recommend_mp.canvas",
+                "viewState": {
+                  "x": -175,
+                  "y": -469.16840299141984,
+                  "zoom": -1.348553313414255
+                }
+              },
+              "icon": "lucide-layout-dashboard",
+              "title": "Recommend_mp"
+            }
+          },
+          {
+            "id": "11e16fac3135d186",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "04_Features/TrustScore.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "TrustScore"
+            }
+          }
+        ],
+        "currentTab": 1
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "74e5d6a0a033adf2",
+    "type": "split",
+    "children": [
+      {
+        "id": "55802ee911aebb6f",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "e488f4c7dcc2851d",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Файловый менеджер"
+            }
+          },
+          {
+            "id": "e0968059cb0f8f9a",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Поиск"
+            }
+          },
+          {
+            "id": "80d692a45ac9abc8",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Закладки"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "4dcd614bb3beb192",
+    "type": "split",
+    "children": [
+      {
+        "id": "39f7aed18e9b08c6",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "c5f9f9e686ad3d28",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "Recommend_mp.canvas",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Обратные ссылки для Recommend_mp"
+            }
+          },
+          {
+            "id": "16167ac6183d5fe6",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "Recommend_mp.canvas",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Исходящие ссылки из Recommend_mp"
+            }
+          },
+          {
+            "id": "8481ac176f7b5573",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Теги"
+            }
+          },
+          {
+            "id": "6d29ea57af502d68",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "Все свойства"
+            }
+          },
+          {
+            "id": "d4e3a1ff36756fb9",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "Recommend_mp.canvas",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Структура Recommend_mp"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Меню быстрого перехода": false,
+      "graph:Граф": false,
+      "canvas:Создать новый холст": false,
+      "daily-notes:Сегодняшняя заметка": false,
+      "templates:Вставить шаблон": false,
+      "command-palette:Открыть палитру команд": false,
+      "bases:Создать новую базу": false,
+      "obsidian-kanban:Create new board": false
+    }
+  },
+  "active": "11e16fac3135d186",
+  "lastOpenFiles": [
+    "99_Inbox/_index.md",
+    "06_Growth/_index.md",
+    "05_Roles/_index.md",
+    "04_Features/_index.md",
+    "03_Design/_index.md",
+    "02_Architecture/ADRs/_index.md",
+    "02_Architecture/_index.md",
+    "01_Project/_index.md",
+    "CLAUDE.md",
+    "Recommend_dashboard.md",
+    "06_Growth/Hypotheses.md",
+    "README.md",
+    "Recommend_mp.canvas",
+    "_INDEX_.md",
+    "01_Project/Overview.md",
+    "Glossary.md.md",
+    "Glossary.md",
+    "_INDEX_.md.md",
+    "00_System/Roadmap_Board.md",
+    "Setup-Obsidian.md",
+    "01_Project/Roadmap.md",
+    "00_System",
+    "01_Project/Glossary.md",
+    "_templates/ADR.md"
+  ]
+}

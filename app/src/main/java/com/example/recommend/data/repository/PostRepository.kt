@@ -1,5 +1,6 @@
 package com.example.recommend.data.repository
 
+import com.example.recommend.data.firestoreWriteOrThrow
 import com.example.recommend.data.model.Post
 import com.example.recommend.data.model.toPostFromDoc
 import com.example.recommend.trustListDataRoot
@@ -77,12 +78,15 @@ class PostRepository(private val db: FirebaseFirestore) {
             "resourceUrl" to (post.resourceUrl ?: ""),
             "createdAt" to System.currentTimeMillis()
         )
-        suspendCancellableCoroutine { cont ->
-            db.trustListDataRoot()
-                .collection("posts")
-                .add(map)
-                .addOnSuccessListener { cont.resume(Unit) }
-                .addOnFailureListener { cont.resumeWithException(it) }
+        // BUG-014 fix: bound the wait on Firestore server ack so callers never hang.
+        firestoreWriteOrThrow {
+            suspendCancellableCoroutine<Unit> { cont ->
+                db.trustListDataRoot()
+                    .collection("posts")
+                    .add(map)
+                    .addOnSuccessListener { cont.resume(Unit) }
+                    .addOnFailureListener { cont.resumeWithException(it) }
+            }
         }
     }
 }

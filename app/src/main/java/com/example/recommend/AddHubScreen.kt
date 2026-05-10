@@ -13,11 +13,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.recommend.ui.theme.*
@@ -32,8 +29,7 @@ fun AddHubScreen(
     campaignBalance: Int = 0,
     onCampaign: () -> Unit = {},
     onPost: () -> Unit = {},
-    onAskPack: () -> Unit = {},
-    onSwitchToBusiness: () -> Unit = {}
+    onAskPack: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -143,29 +139,8 @@ fun AddHubScreen(
             }
         }
 
-        // ── Bottom footnote (user only) ───────────────────────────────────────
-        if (!isBusiness) {
-            Spacer(Modifier.height(32.dp))
-            Text(
-                text = buildAnnotatedString {
-                    withStyle(SpanStyle(color = AppMuted, fontSize = 12.sp)) {
-                        append("Are you a business? ")
-                    }
-                    withStyle(
-                        SpanStyle(
-                            color = AppViolet,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 12.sp
-                        )
-                    ) {
-                        append("Switch to Business →")
-                    }
-                },
-                fontFamily = BodyFontFamily,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.clickable { onSwitchToBusiness() }
-            )
-        }
+        // Switch to Business entry point intentionally lives only in ProfileScreen
+        // (single source of truth for account-level actions). See BusinessUpgradeCard.
     }
 }
 

@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.example.recommend.data.FirestoreWriteTimeout
 import com.example.recommend.data.model.PostCollection
 import com.example.recommend.data.repository.CollectionRepository
 import com.example.recommend.ui.theme.*
@@ -94,6 +95,9 @@ fun SaveCollectionDialog(
                 } else {
                     repo.removePostFromCollection(collection.id, postId)
                 }
+            } catch (_: FirestoreWriteTimeout) {
+                // Network slow — keep the optimistic UI state, the write
+                // is queued in the offline cache and will sync.
             } catch (e: Throwable) {
                 // Откатываем оптимистичный стейт + говорим пользователю
                 optimistic = optimistic - collection.id
@@ -112,6 +116,10 @@ fun SaveCollectionDialog(
         scope.launch {
             try {
                 repo.createCollection(uid = userId, name = name, parentId = null, seedPostId = postId)
+                newCollectionName = ""
+            } catch (_: FirestoreWriteTimeout) {
+                // Optimistic — collection write is queued; clear input so user
+                // doesn't double-tap. The reactive listener will surface it.
                 newCollectionName = ""
             } catch (e: Throwable) {
                 Toast.makeText(context, "Create failed: ${e.message ?: "error"}", Toast.LENGTH_SHORT).show()

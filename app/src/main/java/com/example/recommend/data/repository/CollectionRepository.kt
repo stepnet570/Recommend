@@ -1,5 +1,6 @@
 package com.example.recommend.data.repository
 
+import com.example.recommend.data.firestoreWriteOrThrow
 import com.example.recommend.data.model.PostCollection
 import com.example.recommend.trustListDataRoot
 import com.google.firebase.firestore.DocumentSnapshot
@@ -57,31 +58,38 @@ class CollectionRepository(private val db: FirebaseFirestore) {
         awaitClose { listener.remove() }
     }
 
+    // BUG-015 fix: every suspend write below is wrapped in firestoreWriteOrThrow
+    // so callers never hang waiting for a server ack on bad networks.
+
     /** Создать коллекцию. Возвращает id новой коллекции. */
     suspend fun createCollection(
         uid: String,
         name: String,
         parentId: String? = null,
         seedPostId: String? = null
-    ): String = suspendCancellableCoroutine { cont ->
-        val data = hashMapOf<String, Any?>(
-            "userId" to uid,
-            "name" to name.trim(),
-            "postIds" to if (seedPostId != null) listOf(seedPostId) else emptyList<String>(),
-            "parentId" to parentId,
-            "createdAt" to System.currentTimeMillis()
-        )
-        collectionsRef().add(data)
-            .addOnSuccessListener { ref -> cont.resume(ref.id) }
-            .addOnFailureListener { cont.resumeWithException(it) }
+    ): String = firestoreWriteOrThrow {
+        suspendCancellableCoroutine<String> { cont ->
+            val data = hashMapOf<String, Any?>(
+                "userId" to uid,
+                "name" to name.trim(),
+                "postIds" to if (seedPostId != null) listOf(seedPostId) else emptyList<String>(),
+                "parentId" to parentId,
+                "createdAt" to System.currentTimeMillis()
+            )
+            collectionsRef().add(data)
+                .addOnSuccessListener { ref -> cont.resume(ref.id) }
+                .addOnFailureListener { cont.resumeWithException(it) }
+        }
     }
 
     suspend fun renameCollection(collectionId: String, newName: String): Unit =
-        suspendCancellableCoroutine { cont ->
-            collectionsRef().document(collectionId)
-                .update("name", newName.trim())
-                .addOnSuccessListener { cont.resume(Unit) }
-                .addOnFailureListener { cont.resumeWithException(it) }
+        firestoreWriteOrThrow {
+            suspendCancellableCoroutine<Unit> { cont ->
+                collectionsRef().document(collectionId)
+                    .update("name", newName.trim())
+                    .addOnSuccessListener { cont.resume(Unit) }
+                    .addOnFailureListener { cont.resumeWithException(it) }
+            }
         }
 
     /**
@@ -89,46 +97,54 @@ class CollectionRepository(private val db: FirebaseFirestore) {
      * посты не теряем.
      */
     suspend fun deleteCollection(collectionId: String): Unit =
-        suspendCancellableCoroutine { cont ->
-            val ref = collectionsRef()
-            // 1) сначала находим детей и выставляем им parentId = null
-            ref.whereEqualTo("parentId", collectionId).get()
-                .addOnSuccessListener { childSnap ->
-                    val batch = db.batch()
-                    childSnap.documents.forEach { child ->
-                        batch.update(child.reference, "parentId", null)
+        firestoreWriteOrThrow {
+            suspendCancellableCoroutine<Unit> { cont ->
+                val ref = collectionsRef()
+                // 1) сначала находим детей и выставляем им parentId = null
+                ref.whereEqualTo("parentId", collectionId).get()
+                    .addOnSuccessListener { childSnap ->
+                        val batch = db.batch()
+                        childSnap.documents.forEach { child ->
+                            batch.update(child.reference, "parentId", null)
+                        }
+                        batch.delete(ref.document(collectionId))
+                        batch.commit()
+                            .addOnSuccessListener { cont.resume(Unit) }
+                            .addOnFailureListener { cont.resumeWithException(it) }
                     }
-                    batch.delete(ref.document(collectionId))
-                    batch.commit()
-                        .addOnSuccessListener { cont.resume(Unit) }
-                        .addOnFailureListener { cont.resumeWithException(it) }
-                }
-                .addOnFailureListener { cont.resumeWithException(it) }
+                    .addOnFailureListener { cont.resumeWithException(it) }
+            }
         }
 
     suspend fun savePostToCollection(collectionId: String, postId: String): Unit =
-        suspendCancellableCoroutine { cont ->
-            collectionsRef().document(collectionId)
-                .update("postIds", FieldValue.arrayUnion(postId))
-                .addOnSuccessListener { cont.resume(Unit) }
-                .addOnFailureListener { cont.resumeWithException(it) }
+        firestoreWriteOrThrow {
+            suspendCancellableCoroutine<Unit> { cont ->
+                collectionsRef().document(collectionId)
+                    .update("postIds", FieldValue.arrayUnion(postId))
+                    .addOnSuccessListener { cont.resume(Unit) }
+                    .addOnFailureListener { cont.resumeWithException(it) }
+            }
         }
 
     suspend fun removePostFromCollection(collectionId: String, postId: String): Unit =
-        suspendCancellableCoroutine { cont ->
-            collectionsRef().document(collectionId)
-                .update("postIds", FieldValue.arrayRemove(postId))
-                .addOnSuccessListener { cont.resume(Unit) }
-                .addOnFailureListener { cont.resumeWithException(it) }
+        firestoreWriteOrThrow {
+            suspendCancellableCoroutine<Unit> { cont ->
+                collectionsRef().document(collectionId)
+                    .update("postIds", FieldValue.arrayRemove(postId))
+                    .addOnSuccessListener { cont.resume(Unit) }
+                    .addOnFailureListener { cont.resumeWithException(it) }
+            }
         }
 
     /** Поставить пост обложкой коллекции. Передай null чтобы сбросить. */
     suspend fun setCoverPost(collectionId: String, postId: String?): Unit =
-        suspendCancellableCoroutine { cont ->
-            collectionsRef().document(collectionId)
-                .update("coverPostId", postId)
-                .addOnSuccessListener { cont.resume(Unit) }
-                .addOnFailureListener { cont.resumeWithException(it) }
+        firestoreWriteOrThrow {
+            suspendCancellableCoroutine<Unit> { cont ->
+                collectionsRef().document(collectionId)
+                    .update("coverPostId", postId)
+                    .addOnSuccessListener { cont.resume(Unit) }
+                    .addOnFailureListener { cont.resumeWithException(it) }
+            }
         }
 
     /**
@@ -139,17 +155,19 @@ class CollectionRepository(private val db: FirebaseFirestore) {
         fromCollectionId: String,
         toCollectionId: String,
         postId: String
-    ): Unit = suspendCancellableCoroutine { cont ->
-        if (fromCollectionId == toCollectionId) {
-            cont.resume(Unit); return@suspendCancellableCoroutine
+    ): Unit = firestoreWriteOrThrow {
+        suspendCancellableCoroutine<Unit> { cont ->
+            if (fromCollectionId == toCollectionId) {
+                cont.resume(Unit); return@suspendCancellableCoroutine
+            }
+            val batch = db.batch()
+            val from = collectionsRef().document(fromCollectionId)
+            val to = collectionsRef().document(toCollectionId)
+            batch.update(from, "postIds", FieldValue.arrayRemove(postId))
+            batch.update(to, "postIds", FieldValue.arrayUnion(postId))
+            batch.commit()
+                .addOnSuccessListener { cont.resume(Unit) }
+                .addOnFailureListener { cont.resumeWithException(it) }
         }
-        val batch = db.batch()
-        val from = collectionsRef().document(fromCollectionId)
-        val to = collectionsRef().document(toCollectionId)
-        batch.update(from, "postIds", FieldValue.arrayRemove(postId))
-        batch.update(to, "postIds", FieldValue.arrayUnion(postId))
-        batch.commit()
-            .addOnSuccessListener { cont.resume(Unit) }
-            .addOnFailureListener { cont.resumeWithException(it) }
     }
 }

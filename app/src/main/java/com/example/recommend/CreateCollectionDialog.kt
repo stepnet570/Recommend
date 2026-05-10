@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.example.recommend.data.FirestoreWriteTimeout
 import com.example.recommend.data.repository.CollectionRepository
 import com.example.recommend.ui.theme.*
 import com.google.firebase.auth.FirebaseAuth
@@ -52,8 +53,14 @@ fun CreateCollectionDialog(
         isSaving = true
         scope.launch {
             try {
+                // BUG-012 fix: createCollection now bounds itself with a timeout.
+                // On a real failure we keep the dialog open; on a network timeout
+                // we close optimistically — the write is in the offline cache and
+                // will appear in the reactive collections stream once it syncs.
                 val newId = repo.createCollection(uid, n, parentId)
                 onCreated(newId)
+                onDismiss()
+            } catch (_: FirestoreWriteTimeout) {
                 onDismiss()
             } catch (_: Throwable) {
                 isSaving = false

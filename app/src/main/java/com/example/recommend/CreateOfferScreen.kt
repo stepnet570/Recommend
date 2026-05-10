@@ -30,6 +30,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.recommend.data.TaskWatchdog
 import com.example.recommend.ui.theme.AppTextStyles
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -95,15 +96,30 @@ fun CreateOfferScreen(
             "acceptedBy" to emptyList<String>()
         )
 
+        // BUG-011 fix: Firestore add() can hang on bad networks. Watchdog releases
+        // the loader after 8s; the offer is already in the offline cache and will
+        // sync when network returns.
+        val watchdog = TaskWatchdog.start {
+            isSubmitting = false
+            Toast.makeText(
+                context,
+                "Saved. Campaign will go live when you're back online.",
+                Toast.LENGTH_SHORT
+            ).show()
+            onOfferCreated()
+        }
+
         db.trustListDataRoot()
             .collection("offers")
             .add(data)
             .addOnSuccessListener {
+                if (!watchdog.cancel()) return@addOnSuccessListener
                 isSubmitting = false
                 Toast.makeText(context, "Campaign launched!", Toast.LENGTH_SHORT).show()
                 onOfferCreated()
             }
             .addOnFailureListener { e ->
+                if (!watchdog.cancel()) return@addOnFailureListener
                 isSubmitting = false
                 Toast.makeText(context, e.localizedMessage ?: "Failed to save", Toast.LENGTH_SHORT).show()
             }

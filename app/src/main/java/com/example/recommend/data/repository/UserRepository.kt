@@ -2,6 +2,7 @@ package com.example.recommend.data.repository
 
 import android.util.Log
 import com.example.recommend.WELCOME_TRUST_COINS_BONUS
+import com.example.recommend.data.firestoreWriteOrNull
 import com.example.recommend.data.model.BusinessData
 import com.example.recommend.data.model.UserProfile
 import com.example.recommend.ensureUserProfileForAuthUser
@@ -39,8 +40,17 @@ class UserRepository(private val db: FirebaseFirestore) {
         awaitClose { listener.remove() }
     }
 
-    suspend fun ensureUserProfile(user: FirebaseUser): Unit = suspendCoroutine { cont ->
-        db.ensureUserProfileForAuthUser(user) { cont.resume(Unit) }
+    // BUG-017 fix: ensureUserProfileForAuthUser internally chains getIdToken +
+    // Firestore get + merge — any of those can hang on bad networks. Bound it
+    // so callers (e.g. MainActivity startup) never block forever.
+    suspend fun ensureUserProfile(user: FirebaseUser) {
+        firestoreWriteOrNull {
+            suspendCoroutine<Unit> { cont ->
+                db.ensureUserProfileForAuthUser(user) { cont.resume(Unit) }
+            }
+        }
+        // null result == timeout. Profile migration is best-effort — silently
+        // proceed; the next launch (or any future write) will retry.
     }
 
     /** Count of users whose `following` list contains [uid]. */

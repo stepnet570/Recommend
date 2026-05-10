@@ -37,6 +37,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.recommend.data.TaskWatchdog
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthException
 import com.google.firebase.auth.UserProfileChangeRequest
@@ -75,69 +76,152 @@ fun AuthScreen(onAuthSuccess: () -> Unit) {
     var passwordVisible by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
+    var infoMessage by remember { mutableStateOf("") }
 
     val auth = FirebaseAuth.getInstance()
     val db = FirebaseFirestore.getInstance()
 
+    fun usersCollection() = db.collection("artifacts").document("trustlist-production")
+        .collection("public").document("data")
+        .collection("users")
+
+    // BUG-001 fix: rollback FirebaseAuth user when Firestore profile write fails,
+    // so the email is not locked out of future Sign-up attempts.
+    fun rollbackAuthAndShowError(firebaseUser: com.google.firebase.auth.FirebaseUser, e: Exception) {
+        Log.e("AuthScreen", "Profile write failed, rolling back auth user uid=${firebaseUser.uid}", e)
+        firebaseUser.delete()
+            .addOnCompleteListener { task ->
+                isLoading = false
+                if (!task.isSuccessful) {
+                    Log.e("AuthScreen", "Auth rollback failed; signing out as fallback", task.exception)
+                    auth.signOut()
+                }
+                errorMessage = when (e) {
+                    is FirebaseFirestoreException -> "Could not save profile (${e.code}). Please try again."
+                    else -> e.localizedMessage ?: "Could not save profile. Please try again."
+                }
+            }
+    }
+
+    fun proceedWithSignUp(emailTrim: String, signUpWatchdog: TaskWatchdog) {
+        auth.createUserWithEmailAndPassword(emailTrim, password)
+            .addOnSuccessListener { result ->
+                val firebaseUser = result.user
+                if (firebaseUser == null) {
+                    if (!signUpWatchdog.cancel()) return@addOnSuccessListener
+                    isLoading = false; errorMessage = "Registration error"; return@addOnSuccessListener
+                }
+                val userId = firebaseUser.uid
+                val trimmedName = name.trim().ifEmpty {
+                    emailTrim.substringBefore("@").replaceFirstChar { it.uppercaseChar() }
+                }
+                val userRef = usersCollection().document(userId)
+                val userProfile = buildUserProfileMapForEmailSignUp(
+                    uid = userId, email = emailTrim,
+                    nameFromForm = name, handleFromForm = handle
+                )
+                firebaseUser.updateProfile(
+                    UserProfileChangeRequest.Builder().setDisplayName(trimmedName).build()
+                ).addOnCompleteListener {
+                    firebaseUser.getIdToken(true)
+                        .addOnSuccessListener {
+                            userRef.set(userProfile)
+                                .addOnSuccessListener {
+                                    if (!signUpWatchdog.cancel()) return@addOnSuccessListener
+                                    onAuthSuccess()
+                                }
+                                .addOnFailureListener { e ->
+                                    if (!signUpWatchdog.cancel()) return@addOnFailureListener
+                                    rollbackAuthAndShowError(firebaseUser, e)
+                                }
+                        }
+                        .addOnFailureListener { e ->
+                            if (!signUpWatchdog.cancel()) return@addOnFailureListener
+                            rollbackAuthAndShowError(firebaseUser, e)
+                        }
+                }
+            }
+            .addOnFailureListener {
+                if (!signUpWatchdog.cancel()) return@addOnFailureListener
+                isLoading = false; errorMessage = authErrorMessage(it)
+            }
+    }
+
     fun handleAuth() {
-        if (email.isBlank() || password.isBlank()) {
+        // BUG-003 fix: trim before isBlank so that whitespace-only email is rejected upfront.
+        val emailTrim = email.trim()
+        if (emailTrim.isBlank() || password.isBlank()) {
             errorMessage = "Fill in all fields"
             return
         }
         isLoading = true
         errorMessage = ""
+        infoMessage = ""
 
         if (isLoginMode) {
-            auth.signInWithEmailAndPassword(email.trim(), password)
+            // BUG-006 fix: do NOT block sign-in UI on ensureUserProfileForAuthUser.
+            // BUG-018 fix: ALSO bound signInWithEmailAndPassword itself with a watchdog —
+            // FirebaseAuth network calls can hang on flaky connectivity (DNS, TLS handshake,
+            // background services blocked) and the listener simply never fires.
+            // ensureUserProfileForAuthUser is already invoked in MainActivity.onCreate()
+            // for the currently signed-in user (and runs again after recreate()),
+            // so we can safely complete the auth flow as soon as Firebase Auth confirms.
+            val signInWatchdog = TaskWatchdog.start(timeoutMs = 12_000L) {
+                isLoading = false
+                errorMessage = "Network is slow. Check your connection and try again."
+            }
+            auth.signInWithEmailAndPassword(emailTrim, password)
                 .addOnSuccessListener { result ->
+                    if (!signInWatchdog.cancel()) return@addOnSuccessListener
                     val user = result.user
                     if (user == null) {
                         isLoading = false; errorMessage = "Sign-in failed"; return@addOnSuccessListener
                     }
-                    db.ensureUserProfileForAuthUser(user) { isLoading = false; onAuthSuccess() }
+                    isLoading = false
+                    onAuthSuccess()
                 }
-                .addOnFailureListener { isLoading = false; errorMessage = authErrorMessage(it) }
+                .addOnFailureListener {
+                    if (!signInWatchdog.cancel()) return@addOnFailureListener
+                    isLoading = false; errorMessage = authErrorMessage(it)
+                }
         } else {
-            auth.createUserWithEmailAndPassword(email.trim(), password)
-                .addOnSuccessListener { result ->
-                    val firebaseUser = result.user
-                    if (firebaseUser == null) {
-                        isLoading = false; errorMessage = "Registration error"; return@addOnSuccessListener
-                    }
-                    val userId = firebaseUser.uid
-                    val emailTrim = email.trim()
-                    val trimmedName = name.trim().ifEmpty {
-                        emailTrim.substringBefore("@").replaceFirstChar { it.uppercaseChar() }
-                    }
-                    val userRef = db.collection("artifacts").document("trustlist-production")
-                        .collection("public").document("data")
-                        .collection("users").document(userId)
-                    val userProfile = buildUserProfileMapForEmailSignUp(
-                        uid = userId, email = emailTrim,
-                        nameFromForm = name, handleFromForm = handle
-                    )
-                    fun showErrorAndSignOut(e: Exception) {
+            // BUG-004 fix: pre-check handle uniqueness BEFORE creating the FirebaseAuth user.
+            // This avoids the BUG-001 lock-out scenario for handle conflicts and gives a clear UX message.
+            // BUG-019 fix: sign-up is a 5-step network chain (handle check → createUser →
+            // updateProfile → getIdToken → Firestore set). One global 20s watchdog ensures
+            // the user is never stuck on the loader, even if any step hangs.
+            val signUpWatchdog = TaskWatchdog.start(timeoutMs = 20_000L) {
+                isLoading = false
+                errorMessage = "Network is slow. Check your connection and try again."
+            }
+            // Also bound the handle uniqueness check itself (Firestore get can hang).
+            val handleCheckWatchdog = TaskWatchdog.start(timeoutMs = 6_000L) {
+                // Don't fail registration — fall through to sign-up creation.
+                // Firestore rules will still enforce uniqueness server-side.
+                Log.w("AuthScreen", "Handle check timed out — proceeding with sign-up")
+                proceedWithSignUp(emailTrim, signUpWatchdog)
+            }
+            val resolvedHandle = resolveHandleForRegistration(handle.trim(), emailTrim)
+            usersCollection()
+                .whereEqualTo("handle", resolvedHandle)
+                .limit(1)
+                .get()
+                .addOnSuccessListener { snap ->
+                    if (!handleCheckWatchdog.cancel()) return@addOnSuccessListener
+                    if (!snap.isEmpty) {
+                        signUpWatchdog.cancel()
                         isLoading = false
-                        errorMessage = when (e) {
-                            is FirebaseFirestoreException -> "${e.code}: ${e.message}"
-                            else -> e.localizedMessage ?: "Could not save profile"
-                        }
-                        Log.e("AuthScreen", "Firestore write failed", e)
-                        auth.signOut()
+                        errorMessage = "Handle $resolvedHandle is already taken. Try another."
+                        return@addOnSuccessListener
                     }
-                    firebaseUser.updateProfile(
-                        UserProfileChangeRequest.Builder().setDisplayName(trimmedName).build()
-                    ).addOnCompleteListener {
-                        firebaseUser.getIdToken(true)
-                            .addOnSuccessListener {
-                                userRef.set(userProfile)
-                                    .addOnSuccessListener { onAuthSuccess() }
-                                    .addOnFailureListener { e -> showErrorAndSignOut(e) }
-                            }
-                            .addOnFailureListener { e -> showErrorAndSignOut(e) }
-                    }
+                    proceedWithSignUp(emailTrim, signUpWatchdog)
                 }
-                .addOnFailureListener { isLoading = false; errorMessage = authErrorMessage(it) }
+                .addOnFailureListener { e ->
+                    if (!handleCheckWatchdog.cancel()) return@addOnFailureListener
+                    Log.e("AuthScreen", "Handle uniqueness check failed", e)
+                    // Fail-open: if check itself errors, don't block registration — Firestore rules will still apply.
+                    proceedWithSignUp(emailTrim, signUpWatchdog)
+                }
         }
     }
 
@@ -228,6 +312,27 @@ fun AuthScreen(onAuthSuccess: () -> Unit) {
                         }
                     }
 
+                    // ── Info banner (e.g. "Reset link sent to ...") ──────────
+                    AnimatedVisibility(
+                        visible = infoMessage.isNotEmpty(),
+                        enter = fadeIn() + slideInVertically(),
+                        exit = fadeOut()
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 14.dp)
+                                .background(AppSuccessContainer, RoundedCornerShape(12.dp))
+                                .padding(12.dp)
+                        ) {
+                            Text(
+                                text = infoMessage,
+                                color = AppSuccess,
+                                style = AppTextStyles.BodySmall
+                            )
+                        }
+                    }
+
                     // ── Поля регистрации ──────────────────────────────────────
                     AnimatedVisibility(visible = !isLoginMode) {
                         Column {
@@ -301,7 +406,34 @@ fun AuthScreen(onAuthSuccess: () -> Unit) {
                                 modifier = Modifier.clickable(
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = null
-                                ) { /* TODO: password reset */ }
+                                ) {
+                                    // BUG-002 fix: send Firebase password-reset email.
+                                    val emailTrim = email.trim()
+                                    if (emailTrim.isBlank()) {
+                                        infoMessage = ""
+                                        errorMessage = "Enter your email above first"
+                                        return@clickable
+                                    }
+                                    if (isLoading) return@clickable
+                                    isLoading = true
+                                    errorMessage = ""
+                                    infoMessage = ""
+                                    val resetWatchdog = TaskWatchdog.start(timeoutMs = 10_000L) {
+                                        isLoading = false
+                                        errorMessage = "Network is slow. Try again later."
+                                    }
+                                    auth.sendPasswordResetEmail(emailTrim)
+                                        .addOnSuccessListener {
+                                            if (!resetWatchdog.cancel()) return@addOnSuccessListener
+                                            isLoading = false
+                                            infoMessage = "Reset link sent to $emailTrim"
+                                        }
+                                        .addOnFailureListener { e ->
+                                            if (!resetWatchdog.cancel()) return@addOnFailureListener
+                                            isLoading = false
+                                            errorMessage = authErrorMessage(e)
+                                        }
+                                }
                             )
                         }
                     }
@@ -374,8 +506,13 @@ fun AuthScreen(onAuthSuccess: () -> Unit) {
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null
                             ) {
+                                // BUG-005 fix: clear sign-up-only fields when toggling modes,
+                                // so leftover name/handle don't survive into the other mode.
                                 isLoginMode = !isLoginMode
                                 errorMessage = ""
+                                infoMessage = ""
+                                name = ""
+                                handle = ""
                             }
                         )
                     }

@@ -47,6 +47,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeoutOrNull
 
 @OptIn(ExperimentalAnimationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -123,12 +124,28 @@ fun AskPackScreen(
 
         scope.launch {
             try {
-                val ref = db.trustListDataRoot()
-                    .collection("requests")
-                    .add(requestData)
-                    .await()
-                Log.d("AskPack", "Request created: ${ref.id}")
-                Toast.makeText(context, "Signal sent to your pack! 🐺", Toast.LENGTH_SHORT).show()
+                // BUG-007 fix: Firestore .add().await() waits for SERVER ack.
+                // On flaky networks this hangs forever and the UI loader never disappears.
+                // We wrap with withTimeoutOrNull(8s): if the server doesn't ack in time,
+                // we still close the screen — the write is already persisted in the
+                // Firestore offline cache and will auto-sync when connectivity returns.
+                val ref = withTimeoutOrNull(8_000L) {
+                    db.trustListDataRoot()
+                        .collection("requests")
+                        .add(requestData)
+                        .await()
+                }
+                if (ref != null) {
+                    Log.d("AskPack", "Request created: ${ref.id}")
+                    Toast.makeText(context, "Signal sent to your pack! 🐺", Toast.LENGTH_SHORT).show()
+                } else {
+                    Log.w("AskPack", "Server ack timed out — write queued offline")
+                    Toast.makeText(
+                        context,
+                        "Saved. Will send to your pack when you're back online.",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
                 currentOnCreated()
             } catch (e: Exception) {
                 Log.e("AskPack", "Firestore error: ${e.message}", e)

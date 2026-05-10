@@ -82,7 +82,9 @@ fun ProfileScreen(
     onBack: (() -> Unit)? = null,
     onLogout: () -> Unit = {},
     /** Reverse switch — only shown when userProfile.isBusiness == true. */
-    onSwitchToPersonal: () -> Unit = {}
+    onSwitchToPersonal: () -> Unit = {},
+    /** Forward switch — opens the SwitchToBusinessSheet. Only shown for personal accounts. */
+    onSwitchToBusiness: () -> Unit = {}
 ) {
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     var isAvatarUploading by remember { mutableStateOf(false) }
@@ -322,6 +324,17 @@ fun ProfileScreen(
                     }
                 }
 
+                // Become a business (personal accounts only) — primary upgrade entry point.
+                // Placed in Profile per UX: settings home is the discoverable place for
+                // account-level actions. Single source of truth (no duplicate in AddHub).
+                if (!isViewingOtherUser && !userProfile.isBusiness) {
+                    BusinessUpgradeCard(
+                        bonusAvailable = !userProfile.welcomeBonusGranted,
+                        onClick = onSwitchToBusiness,
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                    )
+                }
+
                 // Switch back to personal (business accounts only)
                 if (!isViewingOtherUser && userProfile.isBusiness) {
                     ProfileOutlinedButton(
@@ -387,6 +400,103 @@ private fun ProfileStat(value: String, label: String) {
             color = AppMuted,
             modifier = Modifier.padding(top = 2.dp)
         )
+    }
+}
+
+// ─── Business upgrade card (primary entry point in Profile) ─────────────────
+
+/**
+ * Hero CTA card shown to personal accounts in their own Profile.
+ * Single source of truth for the "Become a business" entry point — there is
+ * intentionally no duplicate in AddHub.
+ *
+ * Design (Artisan Pastel):
+ * - Full-width gradient AppViolet → AppTeal background, 16dp rounded
+ * - White text + megaphone emoji on gradient
+ * - Gold "+50 TC starter pack" chip when bonus is still available
+ * - Forward arrow on the right
+ *
+ * @param bonusAvailable false once the user has already used their welcome bonus
+ *        (e.g. switched to business once, then back). Hides the gold chip.
+ */
+@Composable
+private fun BusinessUpgradeCard(
+    bonusAvailable: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(
+                Brush.linearGradient(
+                    colors = listOf(AppViolet, AppTeal),
+                    start = Offset(0f, 0f),
+                    end = Offset(800f, 0f)
+                )
+            )
+            .clickable { onClick() }
+            .padding(horizontal = 16.dp, vertical = 14.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            // Megaphone bubble
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(AppWhite.copy(alpha = 0.18f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(text = "📢", fontSize = 22.sp)
+            }
+
+            Spacer(Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Become a business",
+                    fontFamily = HeadingFontFamily,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 16.sp,
+                    color = AppWhite,
+                    letterSpacing = (-0.3).sp
+                )
+                Text(
+                    text = "Run native ad campaigns in your pack",
+                    fontFamily = BodyFontFamily,
+                    fontSize = 12.sp,
+                    color = AppWhite.copy(alpha = 0.85f),
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+
+                if (bonusAvailable) {
+                    Spacer(Modifier.height(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(AppGold)
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = "🪙 +50 TC starter pack",
+                            fontFamily = BodyFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp,
+                            color = AppDark
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.width(8.dp))
+
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                contentDescription = null,
+                tint = AppWhite,
+                modifier = Modifier.size(20.dp)
+            )
+        }
     }
 }
 

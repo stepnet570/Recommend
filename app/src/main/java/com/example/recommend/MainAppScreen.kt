@@ -30,9 +30,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.example.recommend.data.repository.UserRepository
 import com.example.recommend.navigation.AppNavigation
 import com.example.recommend.ui.feed.FeedViewModel
+import com.example.recommend.ui.onboarding.WelcomeOnboardingScreen
 import com.example.recommend.ui.profile.ProfileViewModel
+import com.google.firebase.firestore.FirebaseFirestore
 import com.example.recommend.ui.theme.AppTextStyles
 import com.example.recommend.ui.theme.DarkPastelAnthracite
 import com.example.recommend.ui.theme.AppLime
@@ -84,6 +87,33 @@ fun MainAppScreen(onLogout: () -> Unit) {
     // true только когда пользователь реально заполняет форму (не на экране выбора Hub)
     var isActuallyCreating by remember { mutableStateOf(false) }
     val isInCreationFlow = isAskModalOpen || isActuallyCreating
+
+    // ── First-launch welcome onboarding gate ──────────────────────────────────
+    // Shown when the freshly-signed-up user has `hasSeenWelcomeOnboarding == false`.
+    // Legacy accounts get `true` set during the schema migration in UserProfileFirestore,
+    // so they skip this flow.
+    val profile = currentUserProfile
+    if (profile != null && !profile.hasSeenWelcomeOnboarding) {
+        val userRepo = remember { UserRepository(FirebaseFirestore.getInstance()) }
+        val currentUid = profile.uid
+        val suggested = remember(allUsers, currentUid) {
+            allUsers
+                .asSequence()
+                .filter { it.uid.isNotBlank() && it.uid != currentUid && it.name.isNotBlank() }
+                .sortedByDescending { it.trustScore }
+                .take(5)
+                .toList()
+        }
+        WelcomeOnboardingScreen(
+            suggestedUsers = suggested,
+            onFollowToggle = { user, follow ->
+                if (follow) userRepo.follow(currentUid, user.uid)
+                else userRepo.unfollow(currentUid, user.uid)
+            },
+            onFinish = { userRepo.markWelcomeOnboardingSeen(currentUid) }
+        )
+        return
+    }
 
     fun navigateTo(route: String) {
         navController.navigate(route) {

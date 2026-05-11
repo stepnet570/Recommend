@@ -71,6 +71,36 @@ class UserRepository(private val db: FirebaseFirestore) {
             .update("hasSeenMonetizationOnboarding", true)
     }
 
+    /** Mark the first-launch welcome onboarding as seen for [uid] so it does not appear again. */
+    fun markWelcomeOnboardingSeen(uid: String) {
+        if (uid.isBlank()) return
+        db.trustListDataRoot()
+            .collection("users")
+            .document(uid)
+            .update("hasSeenWelcomeOnboarding", true)
+    }
+
+    /**
+     * Follow [targetUid] from [currentUid]. No-op if either id is blank or
+     * they're the same user. Uses arrayUnion so the call is idempotent.
+     */
+    fun follow(currentUid: String, targetUid: String) {
+        if (currentUid.isBlank() || targetUid.isBlank() || currentUid == targetUid) return
+        db.trustListDataRoot()
+            .collection("users")
+            .document(currentUid)
+            .update("following", FieldValue.arrayUnion(targetUid))
+    }
+
+    /** Unfollow [targetUid] from [currentUid]. */
+    fun unfollow(currentUid: String, targetUid: String) {
+        if (currentUid.isBlank() || targetUid.isBlank()) return
+        db.trustListDataRoot()
+            .collection("users")
+            .document(currentUid)
+            .update("following", FieldValue.arrayRemove(targetUid))
+    }
+
     /**
      * Promote a personal account to business mode (atomic via Firestore transaction).
      * Side effects on first-ever switch (welcomeBonusGranted == false):

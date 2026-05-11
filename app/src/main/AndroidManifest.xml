@@ -4,6 +4,11 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Required to show push notifications on Android 13+ (API 33). On earlier
+         versions the permission is granted automatically. We request it at
+         runtime from MainActivity. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <!-- So we can resolve the Maps app for short links (goo.gl / maps.app) on API 30+ -->
     <queries>
         <package android:name="com.google.android.apps.maps" />
@@ -32,6 +37,22 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Firebase Cloud Messaging service. Receives token refreshes and
+             incoming push messages while the app is in foreground. -->
+        <service
+            android:name=".messaging.RecommendMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!-- Default notification channel for Firebase pushes. The actual
+             channel is created in code (NotificationConstants.ensureDefaultChannel). -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="recommend_default" />
     </application>
 
 </manifest>

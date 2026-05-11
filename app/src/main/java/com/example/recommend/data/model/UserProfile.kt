@@ -33,6 +33,8 @@ data class UserProfile(
     val businessProfile: BusinessData? = null,
     /** Has the user seen the monetization onboarding sheet at least once. */
     val hasSeenMonetizationOnboarding: Boolean = false,
+    /** Has the user seen the first-launch welcome onboarding (3-screen intro + suggested follows). */
+    val hasSeenWelcomeOnboarding: Boolean = false,
     /**
      * Whether the user has already received the +50 TC welcome bonus.
      * Bonus is granted on first switch to business mode (idempotent).
@@ -71,6 +73,7 @@ internal fun userProfileFromSnapshotFields(snap: DocumentSnapshot): UserProfile 
     val businessProfile = parseBusinessProfile(snap.get("businessProfile"))
     val trustRatings = parseTrustRatingsField(snap.get("trustRatings"))
     val hasSeenMonetizationOnboarding = (snap.get("hasSeenMonetizationOnboarding") as? Boolean) ?: false
+    val hasSeenWelcomeOnboarding = (snap.get("hasSeenWelcomeOnboarding") as? Boolean) ?: false
     val welcomeBonusGranted = (snap.get("welcomeBonusGranted") as? Boolean) ?: false
 
     return UserProfile(
@@ -86,6 +89,7 @@ internal fun userProfileFromSnapshotFields(snap: DocumentSnapshot): UserProfile 
         trustCoins = trustCoins,
         businessProfile = businessProfile,
         hasSeenMonetizationOnboarding = hasSeenMonetizationOnboarding,
+        hasSeenWelcomeOnboarding = hasSeenWelcomeOnboarding,
         welcomeBonusGranted = welcomeBonusGranted
     )
 }
@@ -144,6 +148,9 @@ fun DocumentSnapshot.toUserProfileOrNull(): UserProfile? {
     val hasSeenMonetizationOnboarding =
         (get("hasSeenMonetizationOnboarding") as? Boolean) ?: parsed.hasSeenMonetizationOnboarding
 
+    val hasSeenWelcomeOnboarding =
+        (get("hasSeenWelcomeOnboarding") as? Boolean) ?: parsed.hasSeenWelcomeOnboarding
+
     val welcomeBonusGranted =
         (get("welcomeBonusGranted") as? Boolean) ?: parsed.welcomeBonusGranted
 
@@ -154,6 +161,7 @@ fun DocumentSnapshot.toUserProfileOrNull(): UserProfile? {
         isBusiness = isBusiness,
         businessProfile = businessProfile,
         hasSeenMonetizationOnboarding = hasSeenMonetizationOnboarding,
+        hasSeenWelcomeOnboarding = hasSeenWelcomeOnboarding,
         welcomeBonusGranted = welcomeBonusGranted
     )
 }

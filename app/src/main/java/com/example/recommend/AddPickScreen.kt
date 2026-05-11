@@ -74,6 +74,10 @@ fun AddPickScreen(
         val currentUser = auth.currentUser
         val authorName = currentUserProfile?.name?.takeIf { it.isNotBlank() }
             ?: currentUser?.email?.substringBefore("@")?.replaceFirstChar { it.uppercase() } ?: "Anonymous"
+        // Prefer the user's real handle from the profile. Fall back to a slug
+        // derived from the name only if the profile handle is missing.
+        val authorHandle = currentUserProfile?.handle?.takeIf { it.isNotBlank() }
+            ?: "@${authorName.lowercase().replace(Regex("[^a-z0-9_]"), "")}"
 
         val postData = hashMapOf<String, Any>(
             "userId" to (currentUser?.uid ?: ""),
@@ -83,7 +87,7 @@ fun AddPickScreen(
             "location" to "",
             "rating" to 5,
             "authorName" to authorName,
-            "authorHandle" to "@${authorName.lowercase()}",
+            "authorHandle" to authorHandle,
             "createdAt" to System.currentTimeMillis(),
             "replyToRequestId" to requestId
         )

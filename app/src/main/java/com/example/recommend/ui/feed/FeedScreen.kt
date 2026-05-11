@@ -1862,8 +1862,8 @@ fun PostCard(
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(post.authorName, style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold)
-                    Text(post.authorHandle, style = AppTextStyles.BodySmall, color = DarkPastelAnthracite.copy(alpha = 0.5f))
+                    Text(post.authorName.ifBlank { "Pack member" }, style = AppTextStyles.BodyMedium, fontWeight = FontWeight.Bold)
+                    Text(post.authorHandle.ifBlank { "@user" }, style = AppTextStyles.BodySmall, color = DarkPastelAnthracite.copy(alpha = 0.5f))
                 }
                 Text("Today", style = AppTextStyles.BodySmall, color = DarkPastelAnthracite.copy(alpha = 0.45f))
             }

@@ -49,7 +49,7 @@ fun buildUserProfileMapForEmailSignUp(
         "uid" to uid,
         "name" to trimmedName,
         "handle" to resolvedHandle,
-        "bio" to "Hi! I'm on TrustList.",
+        "bio" to "Hi! I'm on Recommend.",
         "avatar" to "https://api.dicebear.com/7.x/avataaars/svg?seed=$uid",
         "following" to emptyList<String>(),
         "trustScore" to 0.0,
@@ -59,6 +59,7 @@ fun buildUserProfileMapForEmailSignUp(
         "trustCoins" to 0,
         "trustRatings" to hashMapOf<String, Any>(),
         "hasSeenMonetizationOnboarding" to false,
+        "hasSeenWelcomeOnboarding" to false,
         "welcomeBonusGranted" to false,
         "email" to emailTrim,
         "createdAt" to System.currentTimeMillis()
@@ -80,7 +81,7 @@ fun buildUserProfileMapFromFirebaseUser(user: FirebaseUser): HashMap<String, Any
         "uid" to uid,
         "name" to name,
         "handle" to handle,
-        "bio" to "Hi! I'm on TrustList.",
+        "bio" to "Hi! I'm on Recommend.",
         "avatar" to avatar,
         "following" to emptyList<String>(),
         "trustScore" to 0.0,
@@ -88,6 +89,7 @@ fun buildUserProfileMapFromFirebaseUser(user: FirebaseUser): HashMap<String, Any
         "trustCoins" to 0,
         "trustRatings" to hashMapOf<String, Any>(),
         "hasSeenMonetizationOnboarding" to false,
+        "hasSeenWelcomeOnboarding" to false,
         "welcomeBonusGranted" to false,
         "email" to email,
         "createdAt" to System.currentTimeMillis()
@@ -107,7 +109,7 @@ private fun defaultProfileMapFromSnapshot(snap: DocumentSnapshot): HashMap<Strin
         "uid" to uid,
         "name" to name,
         "handle" to handle,
-        "bio" to (snap.getString("bio")?.takeIf { it.isNotBlank() } ?: "Hi! I'm on TrustList."),
+        "bio" to (snap.getString("bio")?.takeIf { it.isNotBlank() } ?: "Hi! I'm on Recommend."),
         "avatar" to avatar,
         "following" to emptyList<String>(),
         "trustScore" to 0.0,
@@ -115,6 +117,7 @@ private fun defaultProfileMapFromSnapshot(snap: DocumentSnapshot): HashMap<Strin
         "trustCoins" to 0,
         "trustRatings" to hashMapOf<String, Any>(),
         "hasSeenMonetizationOnboarding" to false,
+        "hasSeenWelcomeOnboarding" to false,
         "welcomeBonusGranted" to false,
         "email" to email,
         "createdAt" to (snap.getLong("createdAt") ?: System.currentTimeMillis())
@@ -180,6 +183,14 @@ internal fun computeLegacyUserProfilePatches(snap: DocumentSnapshot, user: Fireb
     when (snap.get("hasSeenMonetizationOnboarding")) {
         is Boolean -> { /* ok */ }
         else -> patches["hasSeenMonetizationOnboarding"] = false
+    }
+
+    // Legacy migration: existing accounts have already used the app, so we
+    // mark the welcome onboarding as seen to avoid re-showing it. New accounts
+    // get `hasSeenWelcomeOnboarding = false` from the registration builders.
+    when (snap.get("hasSeenWelcomeOnboarding")) {
+        is Boolean -> { /* ok */ }
+        else -> patches["hasSeenWelcomeOnboarding"] = true
     }
 
     // Welcome bonus is now business-tied (granted on first switchToBusiness).

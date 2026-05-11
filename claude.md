@@ -1,6 +1,6 @@
-# TrustList — Project Context for Claude
+# Recommend — Project Context for Claude
 
-## 🎯 Project: TrustList
+## 🎯 Project: Recommend
 A social network for honest local recommendations within a trust circle ("pack").
 Built-in micro-influencer marketplace: businesses pay TrustCoins to users for native content placement.
 
@@ -128,7 +128,7 @@ Use for: flow design, navigation, new feature planning.
 
 ### 📸 Instagram Curator (Growth)
 Use for: viral mechanics, UGC, audience growth.
-**Application for TrustList:**
+**Application for Recommend:**
 - Post/collection sharing mechanics outside the app
 - "Pack Call" as a viral tool (invite a friend to answer)
 - Visual styling of sponsored posts (native, not ad-like)

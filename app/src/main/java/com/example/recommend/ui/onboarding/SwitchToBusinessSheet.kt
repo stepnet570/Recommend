@@ -437,7 +437,7 @@ private fun SuccessPage(
         Spacer(Modifier.height(20.dp))
 
         Text(
-            text = "How TrustList works",
+            text = "How Recommend works",
             style = AppTextStyles.BodyMedium.copy(
                 fontWeight = FontWeight.Bold,
                 fontSize = 15.sp

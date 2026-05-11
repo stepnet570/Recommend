@@ -274,7 +274,7 @@ fun AuthScreen(onAuthSuccess: () -> Unit) {
 
                     // ── auth-title (Syne 22/800) ──────────────────────────────
                     Text(
-                        text = if (isLoginMode) "Welcome back" else "Join TrustList",
+                        text = if (isLoginMode) "Welcome back" else "Join Recommend",
                         style = AppTextStyles.Heading2.copy(
                             fontSize = 22.sp,
                             fontWeight = FontWeight.Black,

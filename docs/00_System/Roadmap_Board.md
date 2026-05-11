@@ -6,7 +6,7 @@ kanban-plugin: board
 
 ## 🟢 Backlog (P2–P3)
 
-- [ ] Collections — create / edit / add post
+- [x] Collections — create / edit / add post
 - [ ] Notifications — новые requests, accepted offers
 - [ ] Business dashboard — аналитика кампаний
 - [ ] Onboarding — первый запуск, выбор роли

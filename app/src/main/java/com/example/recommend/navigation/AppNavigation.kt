@@ -34,6 +34,7 @@ import com.example.recommend.ui.onboarding.SwitchToBusinessSheet
 import com.example.recommend.ui.profile.ProfileScreen
 import com.example.recommend.ui.theme.SoftPastelMint
 import com.example.recommend.data.repository.CollectionRepository
+import com.example.recommend.data.repository.TrustScoreRepository
 import com.example.recommend.data.repository.UserRepository
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -76,6 +77,7 @@ fun AppNavigation(
     val currentUser = FirebaseAuth.getInstance().currentUser
     val collectionRepo = remember { CollectionRepository(db) }
     val userRepo = remember { UserRepository(db) }
+    val trustScoreRepo = remember { TrustScoreRepository(db) }
     val coroutineScope = rememberCoroutineScope()
 
     // --- overlay state ---
@@ -171,6 +173,12 @@ fun AppNavigation(
         db.trustListDataRoot()
             .collection("posts").document(postId)
             .update("ratings.$uid", stars.coerceIn(1, 5))
+            .addOnSuccessListener {
+                // Пересчёт trustScore автору поста (fallback пока CF не задеплоена).
+                // CF onPostWritten сделает то же самое атомарно — формула детерминированная.
+                val authorUid = posts.find { it.id == postId }?.userId ?: return@addOnSuccessListener
+                coroutineScope.launch { trustScoreRepo.recalculateFor(authorUid) }
+            }
     }
 
     fun toggleOfferPause(offer: AdOffer) {

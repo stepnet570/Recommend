@@ -21,6 +21,13 @@ class PostRepository(private val db: FirebaseFirestore) {
         const val PAGE_SIZE = 20L
     }
 
+    /**
+     * После создания поста пересчитываем trustScore автору (изменился posts_count).
+     * Cloud Function onPostWritten делает то же самое; здесь — fallback / гарантия
+     * на случай, когда CF не задеплоена.
+     */
+    private val trustScoreRepo by lazy { TrustScoreRepository(db) }
+
     /** Real-time stream of the first [PAGE_SIZE] posts, ordered newest-first. */
     fun getPostsStream(): Flow<List<Post>> = callbackFlow {
         val listener = db.trustListDataRoot()
@@ -87,6 +94,10 @@ class PostRepository(private val db: FirebaseFirestore) {
                     .addOnSuccessListener { cont.resume(Unit) }
                     .addOnFailureListener { cont.resumeWithException(it) }
             }
+        }
+        // После успешной записи — пересчитать trustScore автору.
+        if (post.userId.isNotBlank()) {
+            trustScoreRepo.recalculateFor(post.userId)
         }
     }
 }

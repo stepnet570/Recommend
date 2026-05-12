@@ -14,10 +14,22 @@ import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.launch
 import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 
 class UserRepository(private val db: FirebaseFirestore) {
+
+    /**
+     * Триггер пересчёта trustScore при follow/unfollow.
+     * Cloud Function onUserWritten делает то же самое атомарно (видит diff массива
+     * following и пересчитывает добавленных/убранных). Клиентский вызов — fallback
+     * для случая, когда CF ещё не задеплоена.
+     */
+    private val trustScoreRepo by lazy { TrustScoreRepository(db) }
+    private val ioScope = kotlinx.coroutines.CoroutineScope(
+        kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO
+    )
 
     fun getUserStream(uid: String): Flow<UserProfile?> = callbackFlow {
         val listener = db.trustListDataRoot()
@@ -90,6 +102,9 @@ class UserRepository(private val db: FirebaseFirestore) {
             .collection("users")
             .document(currentUid)
             .update("following", FieldValue.arrayUnion(targetUid))
+            .addOnSuccessListener {
+                ioScope.launch { trustScoreRepo.recalculateFor(targetUid) }
+            }
     }
 
     /** Unfollow [targetUid] from [currentUid]. */
@@ -99,6 +114,9 @@ class UserRepository(private val db: FirebaseFirestore) {
             .collection("users")
             .document(currentUid)
             .update("following", FieldValue.arrayRemove(targetUid))
+            .addOnSuccessListener {
+                ioScope.launch { trustScoreRepo.recalculateFor(targetUid) }
+            }
     }
 
     /**

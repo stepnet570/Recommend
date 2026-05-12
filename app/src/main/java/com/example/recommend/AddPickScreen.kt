@@ -74,6 +74,10 @@ fun AddPickScreen(
         val currentUser = auth.currentUser
         val authorName = currentUserProfile?.name?.takeIf { it.isNotBlank() }
             ?: currentUser?.email?.substringBefore("@")?.replaceFirstChar { it.uppercase() } ?: "Anonymous"
+        // Prefer the user's real handle from the profile. Fall back to a slug
+        // derived from the name only if the profile handle is missing.
+        val authorHandle = currentUserProfile?.handle?.takeIf { it.isNotBlank() }
+            ?: "@${authorName.lowercase().replace(Regex("[^a-z0-9_]"), "")}"
 
         val postData = hashMapOf<String, Any>(
             "userId" to (currentUser?.uid ?: ""),
@@ -83,7 +87,7 @@ fun AddPickScreen(
             "location" to "",
             "rating" to 5,
             "authorName" to authorName,
-            "authorHandle" to "@${authorName.lowercase()}",
+            "authorHandle" to authorHandle,
             "createdAt" to System.currentTimeMillis(),
             "replyToRequestId" to requestId
         )
@@ -91,16 +95,36 @@ fun AddPickScreen(
         val link = resourceUrl.trim()
         if (link.isNotEmpty()) postData["resourceUrl"] = link
 
+        // BUG-010 fix: same hang as in AddScreen — Firestore add() waits for
+        // server ack and freezes the loader on bad networks. Watchdog closes
+        // the screen after 8s; the write stays in the offline cache and syncs.
+        val watchdog = Runnable {
+            if (!isUploading) return@Runnable
+            isUploading = false
+            Toast.makeText(
+                context,
+                "Saved. Will publish when you're back online.",
+                Toast.LENGTH_SHORT
+            ).show()
+            onPickCreated()
+            onDismiss()
+        }
+        mainHandler.postDelayed(watchdog, 8_000L)
+
         db.trustListDataRoot()
             .collection("posts")
             .add(postData)
             .addOnSuccessListener {
+                mainHandler.removeCallbacks(watchdog)
+                if (!isUploading) return@addOnSuccessListener
                 isUploading = false
                 Toast.makeText(context, "Pick added!", Toast.LENGTH_SHORT).show()
                 onPickCreated()
                 onDismiss()
             }
             .addOnFailureListener { e ->
+                mainHandler.removeCallbacks(watchdog)
+                if (!isUploading) return@addOnFailureListener
                 isUploading = false
                 Toast.makeText(context, "Error: ${e.message}", Toast.LENGTH_SHORT).show()
             }
@@ -134,13 +158,32 @@ fun AddPickScreen(
                 val path = "posts/${currentUser.uid}/${System.currentTimeMillis()}.jpg"
                 val ref = storage.reference.child(path)
                 val metadata = StorageMetadata.Builder().setContentType("image/jpeg").build()
+
+                // Storage upload watchdog — fall back to no-photo publish if it hangs.
+                val storageDone = java.util.concurrent.atomic.AtomicBoolean(false)
+                val storageWatchdog = Runnable {
+                    if (storageDone.compareAndSet(false, true)) {
+                        Toast.makeText(
+                            context,
+                            "Photo upload is slow — publishing without photo.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                        writePickDocument(null)
+                    }
+                }
+                mainHandler.postDelayed(storageWatchdog, 25_000L)
+
                 ref.putBytes(bytes, metadata)
                     .addOnSuccessListener {
                         ref.downloadUrl
                             .addOnSuccessListener { download ->
+                                if (!storageDone.compareAndSet(false, true)) return@addOnSuccessListener
+                                mainHandler.removeCallbacks(storageWatchdog)
                                 mainHandler.post { writePickDocument(download.toString()) }
                             }
                             .addOnFailureListener { e ->
+                                if (!storageDone.compareAndSet(false, true)) return@addOnFailureListener
+                                mainHandler.removeCallbacks(storageWatchdog)
                                 mainHandler.post {
                                     isUploading = false
                                     Toast.makeText(context, "Photo URL: ${e.message}", Toast.LENGTH_SHORT).show()
@@ -148,6 +191,8 @@ fun AddPickScreen(
                             }
                     }
                     .addOnFailureListener { e ->
+                        if (!storageDone.compareAndSet(false, true)) return@addOnFailureListener
+                        mainHandler.removeCallbacks(storageWatchdog)
                         mainHandler.post {
                             isUploading = false
                             Toast.makeText(context, "Upload failed: ${e.message}", Toast.LENGTH_SHORT).show()

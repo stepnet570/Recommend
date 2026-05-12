@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Recommend · Onboarding Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --violet:#7C6FE0;
+    --teal:#3BD4C0;
+    --dark:#1A2A24;
+    --bg:#F8F7F4;
+    --muted:#8A9A95;
+    --gold:#D4AF37;
+    --border:rgba(59,212,192,.18);
+    --white:#FFFFFF;
+    --surface-muted:#F0EEEB;
+    --shadow:0 24px 60px rgba(26,42,36,.10);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--bg);color:var(--dark);font-family:"DM Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+  body{min-height:100vh;padding:40px 24px}
+
+  /* ── Page header ── */
+  .head{max-width:1200px;margin:0 auto 28px;text-align:center}
+  .head h1{font-family:"Syne",sans-serif;font-size:26px;font-weight:800;letter-spacing:-.4px;margin-bottom:8px}
+  .head p{color:var(--muted);font-size:14px}
+
+  /* ── Phone row ── */
+  .phones{
+    display:flex;gap:36px;justify-content:center;align-items:flex-start;
+    flex-wrap:wrap;max-width:1300px;margin:0 auto;
+  }
+
+  /* ── Single phone frame ── */
+  .phone{
+    width:360px;
+    height:740px;
+    background:var(--white);
+    border-radius:38px;
+    box-shadow:var(--shadow);
+    padding:0;
+    position:relative;
+    overflow:hidden;
+    border:8px solid #1A2A24;
+  }
+  .phone .notch{
+    position:absolute;top:0;left:50%;transform:translateX(-50%);
+    width:130px;height:24px;background:#1A2A24;
+    border-radius:0 0 18px 18px;z-index:5;
+  }
+  .phone .statusbar{
+    padding:14px 24px 6px;
+    display:flex;justify-content:space-between;align-items:center;
+    font-size:11px;font-weight:600;color:var(--dark);
+    margin-top:18px;
+  }
+  .phone .statusbar .icons{display:flex;gap:5px;align-items:center}
+  .phone .statusbar .icons svg{width:13px;height:13px}
+
+  .screen{
+    height:calc(100% - 50px);
+    padding:14px 24px 20px;
+    display:flex;
+    flex-direction:column;
+  }
+
+  /* ── Top bar: progress dots + Skip ── */
+  .topbar{
+    display:flex;justify-content:space-between;align-items:center;
+    margin-bottom:36px;
+  }
+  .dots{display:flex;gap:6px}
+  .dot{
+    width:22px;height:4px;border-radius:99px;
+    background:#E5E2DC;
+    transition:.3s;
+  }
+  .dot.active{
+    background:linear-gradient(90deg,var(--violet),var(--teal));
+    width:32px;
+  }
+  .skip{
+    font-size:13px;font-weight:600;color:var(--muted);
+    text-decoration:none;cursor:pointer;
+  }
+
+  /* ── Hero illustration zone ── */
+  .hero{
+    flex-shrink:0;
+    height:240px;
+    display:flex;align-items:center;justify-content:center;
+    position:relative;
+  }
+
+  /* Screen 1: gradient orb with wolf */
+  .orb{
+    width:140px;height:140px;border-radius:50%;
+    background:linear-gradient(135deg,var(--violet),var(--teal));
+    display:grid;place-items:center;
+    box-shadow:0 16px 40px rgba(124,111,224,.32);
+    position:relative;
+  }
+  .orb::before{
+    content:"";position:absolute;inset:-20px;border-radius:50%;
+    border:2px dashed rgba(124,111,224,.20);
+    animation:rotate 24s linear infinite;
+  }
+  .orb::after{
+    content:"";position:absolute;inset:-44px;border-radius:50%;
+    border:1.5px dashed rgba(59,212,192,.15);
+    animation:rotate 36s linear infinite reverse;
+  }
+  @keyframes rotate{to{transform:rotate(360deg)}}
+  .orb-emoji{font-size:64px;line-height:1;filter:drop-shadow(0 4px 12px rgba(0,0,0,.15))}
+
+  /* Screen 2: avatars network */
+  .pack-graph{
+    width:240px;height:200px;position:relative;
+  }
+  .pack-graph .me{
+    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    width:64px;height:64px;border-radius:50%;
+    background:linear-gradient(135deg,var(--violet),var(--teal));
+    display:grid;place-items:center;font-size:30px;
+    box-shadow:0 8px 24px rgba(124,111,224,.30);
+    z-index:3;
+  }
+  .pack-graph .friend{
+    position:absolute;width:46px;height:46px;border-radius:50%;
+    background:var(--white);
+    border:2.5px solid var(--violet);
+    display:grid;place-items:center;font-size:22px;
+    box-shadow:0 4px 12px rgba(26,42,36,.10);
+    z-index:2;
+  }
+  .pack-graph .f1{top:0;left:30px}
+  .pack-graph .f2{top:10px;right:20px;border-color:var(--teal)}
+  .pack-graph .f3{bottom:0;left:50px;border-color:var(--gold)}
+  .pack-graph .f4{bottom:10px;right:38px;border-color:var(--violet)}
+  .pack-graph svg.lines{
+    position:absolute;inset:0;width:100%;height:100%;z-index:1;
+    pointer-events:none;
+  }
+
+  /* Screen 3: signal waves around wolf */
+  .signal{
+    width:160px;height:160px;border-radius:50%;
+    background:var(--white);
+    border:3px solid var(--violet);
+    display:grid;place-items:center;
+    position:relative;font-size:54px;
+    box-shadow:0 12px 32px rgba(26,42,36,.08);
+  }
+  .signal::before,
+  .signal::after{
+    content:"";position:absolute;inset:0;border-radius:50%;
+    border:2px solid var(--teal);
+    animation:pulse 2.2s ease-out infinite;
+  }
+  .signal::after{animation-delay:1.1s}
+  @keyframes pulse{
+    0%{transform:scale(1);opacity:.7}
+    100%{transform:scale(1.9);opacity:0}
+  }
+
+  /* ── Text content ── */
+  .copy{flex:1;display:flex;flex-direction:column;justify-content:flex-start;padding-top:14px}
+  .copy h2{
+    font-family:"Syne",sans-serif;
+    font-size:26px;font-weight:800;
+    line-height:1.15;letter-spacing:-.6px;
+    margin-bottom:14px;
+  }
+  .copy p{
+    color:var(--muted);
+    font-size:15px;line-height:1.55;
+    max-width:300px;
+  }
+  .copy .accent{color:var(--dark);font-weight:600}
+
+  /* ── Suggested users (screen 3) ── */
+  .suggestions{
+    margin-top:18px;
+    display:flex;flex-direction:column;gap:10px;
+    max-height:280px;overflow-y:auto;
+  }
+  .suggestions::-webkit-scrollbar{display:none}
+  .user-row{
+    display:flex;align-items:center;gap:12px;
+    background:var(--surface-muted);
+    border-radius:14px;
+    padding:10px 12px;
+  }
+  .user-row .ava{
+    width:38px;height:38px;border-radius:50%;
+    display:grid;place-items:center;font-size:18px;
+    background:linear-gradient(135deg,var(--violet),var(--teal));
+    color:#fff;font-weight:700;
+    flex-shrink:0;
+  }
+  .user-row .ava.v2{background:linear-gradient(135deg,#F09A6E,var(--gold))}
+  .user-row .ava.v3{background:linear-gradient(135deg,var(--teal),#5BB8F2)}
+  .user-row .ava.v4{background:linear-gradient(135deg,#9C7CE0,#D78ECF)}
+  .user-row .ava.v5{background:linear-gradient(135deg,#6FCB89,var(--teal))}
+  .user-row .info{flex:1;min-width:0}
+  .user-row .name{font-size:14px;font-weight:600;line-height:1.2}
+  .user-row .bio{font-size:12px;color:var(--muted);margin-top:2px;line-height:1.2;
+                 white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .follow-btn{
+    flex-shrink:0;
+    width:34px;height:34px;border-radius:50%;
+    border:1.5px solid var(--violet);
+    background:transparent;color:var(--violet);
+    font-size:18px;font-weight:600;cursor:pointer;
+    display:grid;place-items:center;
+    transition:.15s;
+  }
+  .follow-btn.followed{
+    background:linear-gradient(135deg,var(--violet),var(--teal));
+    color:var(--white);border-color:transparent;
+  }
+  .follow-btn.followed::before{
+    content:"✓";font-size:16px;
+  }
+  .follow-btn:not(.followed)::before{
+    content:"+";font-size:22px;line-height:1;
+  }
+
+  /* ── Footer CTA ── */
+  .footer{
+    flex-shrink:0;padding-top:14px;
+  }
+  .cta{
+    width:100%;height:54px;border-radius:99px;
+    background:linear-gradient(135deg,var(--violet),var(--teal));
+    color:#fff;border:none;cursor:pointer;
+    font-family:"Syne",sans-serif;font-size:16px;font-weight:700;
+    box-shadow:0 8px 22px rgba(124,111,224,.30);
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    transition:.15s;
+  }
+  .cta:active{transform:translateY(1px)}
+  .cta .arrow{font-size:18px}
+  .cta-secondary{
+    width:100%;text-align:center;margin-top:12px;
+    font-size:13px;color:var(--muted);font-weight:500;cursor:pointer;
+  }
+
+  /* Phone caption */
+  .caption{
+    width:360px;text-align:center;color:var(--muted);
+    font-size:13px;margin-top:14px;
+    font-family:"DM Sans",sans-serif;
+  }
+  .caption b{color:var(--dark);font-weight:700;display:block;
+              font-family:"Syne",sans-serif;font-size:14px;letter-spacing:.3px}
+
+  @media (max-width:1200px){
+    .phones{gap:24px}
+  }
+</style>
+</head>
+<body>
+
+<div class="head">
+  <h1>Onboarding · Recommend</h1>
+  <p>3 screens · one idea per screen · last screen = action</p>
+</div>
+
+<div class="phones">
+
+  <!-- ─────────────── SCREEN 1: WHY ─────────────── -->
+  <div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="statusbar">
+        <span>9:41</span>
+        <div class="icons">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 17l5-5 4 4 7-7v3l-7 7-4-4-5 5z"/></svg>
+          <svg viewBox="0 0 24 24" fill="currentColor"><rect x="2" y="9" width="20" height="6" rx="2"/></svg>
+        </div>
+      </div>
+      <div class="screen">
+        <div class="topbar">
+          <div class="dots">
+            <span class="dot active"></span>
+            <span class="dot"></span>
+            <span class="dot"></span>
+          </div>
+          <span class="skip">Skip</span>
+        </div>
+
+        <div class="hero">
+          <div class="orb">
+            <div class="orb-emoji">🐺</div>
+          </div>
+        </div>
+
+        <div class="copy">
+          <h2>Recommendations<br>from people you trust</h2>
+          <p>Recommend is a feed where local advice comes only from <span class="accent">your circle of trust</span>. No algorithms. No hidden ads.</p>
+        </div>
+
+        <div class="footer">
+          <button class="cta">Next <span class="arrow">→</span></button>
+        </div>
+      </div>
+    </div>
+    <div class="caption"><b>Screen 1 · WHY</b>What makes it different from Insta / Google Maps</div>
+  </div>
+
+  <!-- ─────────────── SCREEN 2: HOW ─────────────── -->
+  <div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="statusbar">
+        <span>9:41</span>
+        <div class="icons">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 17l5-5 4 4 7-7v3l-7 7-4-4-5 5z"/></svg>
+          <svg viewBox="0 0 24 24" fill="currentColor"><rect x="2" y="9" width="20" height="6" rx="2"/></svg>
+        </div>
+      </div>
+      <div class="screen">
+        <div class="topbar">
+          <div class="dots">
+            <span class="dot"></span>
+            <span class="dot active"></span>
+            <span class="dot"></span>
+          </div>
+          <span class="skip">Skip</span>
+        </div>
+
+        <div class="hero">
+          <div class="signal">📣</div>
+        </div>
+
+        <div class="copy">
+          <h2>Ask — your<br>pack answers</h2>
+          <p>Not sure where to eat or what to try? Drop a <span class="accent">Pack Call</span> — your circle responds fast, with no ads in the way.</p>
+        </div>
+
+        <div class="footer">
+          <button class="cta">Next <span class="arrow">→</span></button>
+        </div>
+      </div>
+    </div>
+    <div class="caption"><b>Screen 2 · HOW</b>Key mechanic — Pack Call</div>
+  </div>
+
+  <!-- ─────────────── SCREEN 3: DO ─────────────── -->
+  <div>
+    <div class="phone">
+      <div class="notch"></div>
+      <div class="statusbar">
+        <span>9:41</span>
+        <div class="icons">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2 17l5-5 4 4 7-7v3l-7 7-4-4-5 5z"/></svg>
+          <svg viewBox="0 0 24 24" fill="currentColor"><rect x="2" y="9" width="20" height="6" rx="2"/></svg>
+        </div>
+      </div>
+      <div class="screen">
+        <div class="topbar">
+          <div class="dots">
+            <span class="dot"></span>
+            <span class="dot"></span>
+            <span class="dot active"></span>
+          </div>
+          <span class="skip">Skip</span>
+        </div>
+
+        <div class="copy" style="padding-top:0">
+          <h2>Find your pack</h2>
+          <p style="margin-bottom:6px">Pick a few people whose taste you trust. Their picks will show up in your feed.</p>
+        </div>
+
+        <div class="suggestions">
+          <div class="user-row">
+            <div class="ava">A</div>
+            <div class="info">
+              <div class="name">Anna Voronova</div>
+              <div class="bio">Foodie · Tbilisi · coffee spots</div>
+            </div>
+            <button class="follow-btn followed"></button>
+          </div>
+          <div class="user-row">
+            <div class="ava v2">M</div>
+            <div class="info">
+              <div class="name">Michael Sokolov</div>
+              <div class="bio">Travel · Georgia · bars</div>
+            </div>
+            <button class="follow-btn followed"></button>
+          </div>
+          <div class="user-row">
+            <div class="ava v3">K</div>
+            <div class="info">
+              <div class="name">Kate Chen</div>
+              <div class="bio">Designer · Berlin · art &amp; design</div>
+            </div>
+            <button class="follow-btn"></button>
+          </div>
+          <div class="user-row">
+            <div class="ava v4">D</div>
+            <div class="info">
+              <div class="name">Denis Orlov</div>
+              <div class="bio">Music · Lisbon · nightlife</div>
+            </div>
+            <button class="follow-btn followed"></button>
+          </div>
+          <div class="user-row">
+            <div class="ava v5">L</div>
+            <div class="info">
+              <div class="name">Lana Beck</div>
+              <div class="bio">Wellness · Tbilisi · spa &amp; yoga</div>
+            </div>
+            <button class="follow-btn"></button>
+          </div>
+        </div>
+
+        <div class="footer">
+          <button class="cta">Get started <span class="arrow">→</span></button>
+          <div class="cta-secondary">Skip for now</div>
+        </div>
+      </div>
+    </div>
+    <div class="caption"><b>Screen 3 · DO</b>Action, not theory</div>
+  </div>
+
+</div>
+
+<script>
+  // Toggle follow buttons for demo
+  document.querySelectorAll(".follow-btn").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      btn.classList.toggle("followed");
+    });
+  });
+</script>
+</body>
+</html>

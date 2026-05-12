@@ -48,6 +48,7 @@ fun DocumentSnapshot.toPostFromDoc(): Post {
         ratingsByUser = ratingsByUser,
         likesByUser = likesByUser,
         replyToRequestId = replyToRequestId?.takeIf { it.isNotBlank() },
-        resourceUrl = getString("resourceUrl")?.takeIf { it.isNotBlank() }
+        resourceUrl = getString("resourceUrl")?.takeIf { it.isNotBlank() },
+        createdAt = getLong("createdAt") ?: 0L
     )
 }

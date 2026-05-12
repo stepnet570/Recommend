@@ -1,0 +1,11 @@
+{
+	"nodes":[
+		{"id":"e32b8a43274d3a43","type":"file","file":"01_Project/Overview.md","x":-640,"y":-498,"width":400,"height":400},
+		{"id":"99ce3325128c00c2","type":"text","text":"Лендинг","x":40,"y":-558,"width":250,"height":60},
+		{"id":"0a48354caf2f5163","x":90,"y":-1160,"width":400,"height":400,"type":"file","file":"00_System/Roadmap_Board.md"}
+	],
+	"edges":[
+		{"id":"5364fd442f94dca8","fromNode":"e32b8a43274d3a43","fromSide":"right","toNode":"99ce3325128c00c2","toSide":"left"},
+		{"id":"bec5bc1649853881","fromNode":"e32b8a43274d3a43","fromSide":"top","toNode":"0a48354caf2f5163","toSide":"left"}
+	]
+}

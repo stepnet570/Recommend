@@ -73,6 +73,8 @@ fun PublicUserProfileScreen(
                             name = doc.getString("name") ?: "",
                             postIds = (doc.get("postIds") as? List<*>)?.mapNotNull { it as? String }
                                 ?: emptyList(),
+                            parentId = doc.getString("parentId"),
+                            coverPostId = doc.getString("coverPostId"),
                             createdAt = doc.getLong("createdAt") ?: 0L
                         )
                     }

@@ -30,7 +30,16 @@ data class UserProfile(
     val trustRatings: Map<String, Int> = emptyMap(),
     val isBusiness: Boolean = false,
     val trustCoins: Int = 0,
-    val businessProfile: BusinessData? = null
+    val businessProfile: BusinessData? = null,
+    /** Has the user seen the monetization onboarding sheet at least once. */
+    val hasSeenMonetizationOnboarding: Boolean = false,
+    /** Has the user seen the first-launch welcome onboarding (3-screen intro + suggested follows). */
+    val hasSeenWelcomeOnboarding: Boolean = false,
+    /**
+     * Whether the user has already received the +50 TC welcome bonus.
+     * Bonus is granted on first switch to business mode (idempotent).
+     */
+    val welcomeBonusGranted: Boolean = false
 )
 
 /**
@@ -63,6 +72,9 @@ internal fun userProfileFromSnapshotFields(snap: DocumentSnapshot): UserProfile 
     }
     val businessProfile = parseBusinessProfile(snap.get("businessProfile"))
     val trustRatings = parseTrustRatingsField(snap.get("trustRatings"))
+    val hasSeenMonetizationOnboarding = (snap.get("hasSeenMonetizationOnboarding") as? Boolean) ?: false
+    val hasSeenWelcomeOnboarding = (snap.get("hasSeenWelcomeOnboarding") as? Boolean) ?: false
+    val welcomeBonusGranted = (snap.get("welcomeBonusGranted") as? Boolean) ?: false
 
     return UserProfile(
         uid = uid,
@@ -75,7 +87,10 @@ internal fun userProfileFromSnapshotFields(snap: DocumentSnapshot): UserProfile 
         trustRatings = trustRatings,
         isBusiness = isBusiness,
         trustCoins = trustCoins,
-        businessProfile = businessProfile
+        businessProfile = businessProfile,
+        hasSeenMonetizationOnboarding = hasSeenMonetizationOnboarding,
+        hasSeenWelcomeOnboarding = hasSeenWelcomeOnboarding,
+        welcomeBonusGranted = welcomeBonusGranted
     )
 }
 
@@ -130,12 +145,24 @@ fun DocumentSnapshot.toUserProfileOrNull(): UserProfile? {
 
     val trustRatings = parseTrustRatingsField(get("trustRatings"))
 
+    val hasSeenMonetizationOnboarding =
+        (get("hasSeenMonetizationOnboarding") as? Boolean) ?: parsed.hasSeenMonetizationOnboarding
+
+    val hasSeenWelcomeOnboarding =
+        (get("hasSeenWelcomeOnboarding") as? Boolean) ?: parsed.hasSeenWelcomeOnboarding
+
+    val welcomeBonusGranted =
+        (get("welcomeBonusGranted") as? Boolean) ?: parsed.welcomeBonusGranted
+
     return parsed.copy(
         trustScore = trustScore,
         trustCoins = trustCoins,
         trustRatings = trustRatings,
         isBusiness = isBusiness,
-        businessProfile = businessProfile
+        businessProfile = businessProfile,
+        hasSeenMonetizationOnboarding = hasSeenMonetizationOnboarding,
+        hasSeenWelcomeOnboarding = hasSeenWelcomeOnboarding,
+        welcomeBonusGranted = welcomeBonusGranted
     )
 }
 

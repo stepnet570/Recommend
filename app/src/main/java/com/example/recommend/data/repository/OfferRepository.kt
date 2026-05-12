@@ -1,5 +1,6 @@
 package com.example.recommend.data.repository
 
+import com.example.recommend.data.firestoreWriteOrThrow
 import com.example.recommend.data.model.AdOffer
 import com.example.recommend.data.model.toAdOfferOrNull
 import com.example.recommend.trustListDataRoot
@@ -56,15 +57,19 @@ class OfferRepository(private val db: FirebaseFirestore) {
         awaitClose { listener.remove() }
     }
 
+    // BUG-016 fix: runTransaction REQUIRES network — give it more headroom (12s)
+    // than plain writes (8s), but still bound it so the UI never hangs forever.
     suspend fun acceptOffer(offerId: String, userId: String, coins: Int): Unit =
-        suspendCancellableCoroutine { cont ->
-            val offerRef = db.trustListDataRoot().collection("offers").document(offerId)
-            val userRef = db.trustListDataRoot().collection("users").document(userId)
-            db.runTransaction { tx ->
-                tx.update(offerRef, "promoterUserIds", FieldValue.arrayUnion(userId))
-                tx.update(userRef, "trustCoins", FieldValue.increment(coins.toLong()))
+        firestoreWriteOrThrow(timeoutMs = 12_000L) {
+            suspendCancellableCoroutine<Unit> { cont ->
+                val offerRef = db.trustListDataRoot().collection("offers").document(offerId)
+                val userRef = db.trustListDataRoot().collection("users").document(userId)
+                db.runTransaction { tx ->
+                    tx.update(offerRef, "promoterUserIds", FieldValue.arrayUnion(userId))
+                    tx.update(userRef, "trustCoins", FieldValue.increment(coins.toLong()))
+                }
+                    .addOnSuccessListener { cont.resume(Unit) }
+                    .addOnFailureListener { cont.resumeWithException(it) }
             }
-                .addOnSuccessListener { cont.resume(Unit) }
-                .addOnFailureListener { cont.resumeWithException(it) }
         }
 }

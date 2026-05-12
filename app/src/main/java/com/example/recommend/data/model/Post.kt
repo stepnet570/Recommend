@@ -11,15 +11,17 @@ data class Post(
     val location: String = "",
     val rating: Int = 5,
     val imageUrl: String? = null,
-    val authorName: String = "Alex",
-    val authorHandle: String = "@alex",
+    val authorName: String = "",
+    val authorHandle: String = "",
     val isSponsored: Boolean = false,
     val ratingsByUser: Map<String, Int> = emptyMap(),
     val likesByUser: Set<String> = emptySet(),
     /** Set when this post is a reply to a pack «signal» (request). */
     val replyToRequestId: String? = null,
     /** External link (e.g. website) for signal replies / picks. */
-    val resourceUrl: String? = null
+    val resourceUrl: String? = null,
+    /** Unix timestamp (ms) when the post was created — used for "X ago" display. */
+    val createdAt: Long = 0L
 )
 
 fun Post.averageAudienceRatingStars(): Int? {

@@ -47,6 +47,7 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeoutOrNull
 
 @OptIn(ExperimentalAnimationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -62,7 +63,7 @@ fun AskPackScreen(
     var step by remember { mutableStateOf(1) }
     var text by remember { mutableStateOf("") }
     var location by remember { mutableStateOf("") }
-    var selectedTags by remember { mutableStateOf(setOf<String>()) }
+    var selectedTags by remember { mutableStateOf(setOf<PostCategory>()) }
     var selectedUsers by remember { mutableStateOf(setOf<String>()) }
     var isSubmitting by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -76,7 +77,7 @@ fun AskPackScreen(
     val currentOnDismiss by rememberUpdatedState(onDismiss)
     val currentOnCreated by rememberUpdatedState(onCreated)
 
-    val availableTags = listOf("🍔 Eat", "🍷 Drink", "🆘 Urgent", "📅 Date", "🔧 Services", "🎉 Party")
+    val availableTags = PostCategory.all
 
     val packUsers = users.filter { currentUserProfile?.following?.contains(it.uid) == true }
 
@@ -109,7 +110,7 @@ fun AskPackScreen(
             "userId" to currentUser.uid,
             "authorName" to authorName,
             "text" to text.trim(),
-            "tags" to selectedTags.toList(),
+            "tags" to selectedTags.map { it.firestoreKey },
             "location" to location.trim().ifBlank { "Current area" },
             "selectedUsers" to selectedUsers.toList(),
             "status" to "active",
@@ -118,23 +119,41 @@ fun AskPackScreen(
 
         Log.d("AskPack", "Submitting request: text=${text.trim()}, users=${selectedUsers.size}")
 
+        isSubmitting = true
+        errorMessage = null
+
         scope.launch {
-            isSubmitting = true
-            errorMessage = null
             try {
-                val ref = db.trustListDataRoot()
-                    .collection("requests")
-                    .add(requestData)
-                    .await()
-                Log.d("AskPack", "Request created: ${ref.id}")
-                Toast.makeText(context, "Signal sent to your pack! 🐺", Toast.LENGTH_SHORT).show()
+                // BUG-007 fix: Firestore .add().await() waits for SERVER ack.
+                // On flaky networks this hangs forever and the UI loader never disappears.
+                // We wrap with withTimeoutOrNull(8s): if the server doesn't ack in time,
+                // we still close the screen — the write is already persisted in the
+                // Firestore offline cache and will auto-sync when connectivity returns.
+                val ref = withTimeoutOrNull(8_000L) {
+                    db.trustListDataRoot()
+                        .collection("requests")
+                        .add(requestData)
+                        .await()
+                }
+                if (ref != null) {
+                    Log.d("AskPack", "Request created: ${ref.id}")
+                    Toast.makeText(context, "Signal sent to your pack! 🐺", Toast.LENGTH_SHORT).show()
+                } else {
+                    Log.w("AskPack", "Server ack timed out — write queued offline")
+                    Toast.makeText(
+                        context,
+                        "Saved. Will send to your pack when you're back online.",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
                 currentOnCreated()
             } catch (e: Exception) {
                 Log.e("AskPack", "Firestore error: ${e.message}", e)
-                isSubmitting = false
                 val msg = e.message ?: "Failed to send"
                 errorMessage = msg
                 Toast.makeText(context, "Error: $msg", Toast.LENGTH_LONG).show()
+            } finally {
+                isSubmitting = false
             }
         }
     }
@@ -230,7 +249,7 @@ fun AskPackScreen(
                                                         .padding(horizontal = 16.dp, vertical = 10.dp)
                                                 ) {
                                                     Text(
-                                                        tag,
+                                                        tag.chipLabel,
                                                         color = if (isSelected) Color.White else AppDark,
                                                         fontWeight = FontWeight.Bold,
                                                         fontSize = 13.sp

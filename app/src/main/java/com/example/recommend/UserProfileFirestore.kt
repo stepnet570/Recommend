@@ -13,7 +13,10 @@ import com.google.firebase.firestore.SetOptions
 private const val TAG = "UserProfileFirestore"
 
 /** Bump when schema defaults change so migration runs again for all users. */
-private const val USER_PROFILE_MIGRATION_VERSION = 3
+private const val USER_PROFILE_MIGRATION_VERSION = 4
+
+/** Welcome bonus given to every newly registered user, redeemable on first sponsored offer. */
+const val WELCOME_TRUST_COINS_BONUS = 50
 
 private fun migrationPrefsKey(): String = "user_profile_migration_v$USER_PROFILE_MIGRATION_VERSION"
 
@@ -46,13 +49,18 @@ fun buildUserProfileMapForEmailSignUp(
         "uid" to uid,
         "name" to trimmedName,
         "handle" to resolvedHandle,
-        "bio" to "Hi! I'm on TrustList.",
+        "bio" to "Hi! I'm on Recommend.",
         "avatar" to "https://api.dicebear.com/7.x/avataaars/svg?seed=$uid",
         "following" to emptyList<String>(),
         "trustScore" to 0.0,
         "isBusiness" to false,
+        // Welcome bonus is no longer granted at registration — it's now tied
+        // to switching to business mode (one-time, idempotent via welcomeBonusGranted).
         "trustCoins" to 0,
         "trustRatings" to hashMapOf<String, Any>(),
+        "hasSeenMonetizationOnboarding" to false,
+        "hasSeenWelcomeOnboarding" to false,
+        "welcomeBonusGranted" to false,
         "email" to emailTrim,
         "createdAt" to System.currentTimeMillis()
     )
@@ -73,13 +81,16 @@ fun buildUserProfileMapFromFirebaseUser(user: FirebaseUser): HashMap<String, Any
         "uid" to uid,
         "name" to name,
         "handle" to handle,
-        "bio" to "Hi! I'm on TrustList.",
+        "bio" to "Hi! I'm on Recommend.",
         "avatar" to avatar,
         "following" to emptyList<String>(),
         "trustScore" to 0.0,
         "isBusiness" to false,
         "trustCoins" to 0,
         "trustRatings" to hashMapOf<String, Any>(),
+        "hasSeenMonetizationOnboarding" to false,
+        "hasSeenWelcomeOnboarding" to false,
+        "welcomeBonusGranted" to false,
         "email" to email,
         "createdAt" to System.currentTimeMillis()
     )
@@ -98,13 +109,16 @@ private fun defaultProfileMapFromSnapshot(snap: DocumentSnapshot): HashMap<Strin
         "uid" to uid,
         "name" to name,
         "handle" to handle,
-        "bio" to (snap.getString("bio")?.takeIf { it.isNotBlank() } ?: "Hi! I'm on TrustList."),
+        "bio" to (snap.getString("bio")?.takeIf { it.isNotBlank() } ?: "Hi! I'm on Recommend."),
         "avatar" to avatar,
         "following" to emptyList<String>(),
         "trustScore" to 0.0,
         "isBusiness" to false,
         "trustCoins" to 0,
         "trustRatings" to hashMapOf<String, Any>(),
+        "hasSeenMonetizationOnboarding" to false,
+        "hasSeenWelcomeOnboarding" to false,
+        "welcomeBonusGranted" to false,
         "email" to email,
         "createdAt" to (snap.getLong("createdAt") ?: System.currentTimeMillis())
     )
@@ -164,6 +178,32 @@ internal fun computeLegacyUserProfilePatches(snap: DocumentSnapshot, user: Fireb
             "address" to "",
             "businessAvatar" to ""
         )
+    }
+
+    when (snap.get("hasSeenMonetizationOnboarding")) {
+        is Boolean -> { /* ok */ }
+        else -> patches["hasSeenMonetizationOnboarding"] = false
+    }
+
+    // Legacy migration: existing accounts have already used the app, so we
+    // mark the welcome onboarding as seen to avoid re-showing it. New accounts
+    // get `hasSeenWelcomeOnboarding = false` from the registration builders.
+    when (snap.get("hasSeenWelcomeOnboarding")) {
+        is Boolean -> { /* ok */ }
+        else -> patches["hasSeenWelcomeOnboarding"] = true
+    }
+
+    // Welcome bonus is now business-tied (granted on first switchToBusiness).
+    // For legacy accounts: heuristic — if they already have >= 50 TC, treat as
+    // already-granted (probably got it from an earlier build); otherwise eligible.
+    when (snap.get("welcomeBonusGranted")) {
+        is Boolean -> { /* ok */ }
+        else -> {
+            val existingCoins = (snap.get("trustCoins") as? Number)?.toInt() ?: 0
+            val alreadyGranted = existingCoins >= WELCOME_TRUST_COINS_BONUS
+            patches["welcomeBonusGranted"] = alreadyGranted
+            Log.i(TAG, "Migrating welcomeBonusGranted=$alreadyGranted for uid=${snap.id} (coins=$existingCoins)")
+        }
     }
 
     return patches

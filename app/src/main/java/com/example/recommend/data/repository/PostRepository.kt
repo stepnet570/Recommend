@@ -1,5 +1,6 @@
 package com.example.recommend.data.repository
 
+import com.example.recommend.data.firestoreWriteOrThrow
 import com.example.recommend.data.model.Post
 import com.example.recommend.data.model.toPostFromDoc
 import com.example.recommend.trustListDataRoot
@@ -15,10 +16,24 @@ import kotlin.coroutines.resumeWithException
 
 class PostRepository(private val db: FirebaseFirestore) {
 
+    companion object {
+        /** Number of posts per page — first page is real-time, further pages are one-shot. */
+        const val PAGE_SIZE = 20L
+    }
+
+    /**
+     * После создания поста пересчитываем trustScore автору (изменился posts_count).
+     * Cloud Function onPostWritten делает то же самое; здесь — fallback / гарантия
+     * на случай, когда CF не задеплоена.
+     */
+    private val trustScoreRepo by lazy { TrustScoreRepository(db) }
+
+    /** Real-time stream of the first [PAGE_SIZE] posts, ordered newest-first. */
     fun getPostsStream(): Flow<List<Post>> = callbackFlow {
         val listener = db.trustListDataRoot()
             .collection("posts")
             .orderBy("createdAt", Query.Direction.DESCENDING)
+            .limit(PAGE_SIZE)
             .addSnapshotListener { snapshot, _ ->
                 if (snapshot != null) {
                     trySend(snapshot.documents.map { it.toPostFromDoc() })
@@ -26,6 +41,24 @@ class PostRepository(private val db: FirebaseFirestore) {
             }
         awaitClose { listener.remove() }
     }
+
+    /**
+     * One-shot fetch of the next page of posts older than [beforeTimestamp].
+     * Returns an empty list when there are no more posts.
+     */
+    suspend fun loadMorePosts(beforeTimestamp: Long): List<Post> =
+        suspendCancellableCoroutine { cont ->
+            db.trustListDataRoot()
+                .collection("posts")
+                .orderBy("createdAt", Query.Direction.DESCENDING)
+                .whereLessThan("createdAt", beforeTimestamp)
+                .limit(PAGE_SIZE)
+                .get()
+                .addOnSuccessListener { snap ->
+                    cont.resume(snap.documents.map { it.toPostFromDoc() })
+                }
+                .addOnFailureListener { cont.resumeWithException(it) }
+        }
 
     fun toggleLike(postId: String, uid: String, currentlyLiked: Boolean) {
         val ref = db.trustListDataRoot().collection("posts").document(postId)
@@ -52,12 +85,19 @@ class PostRepository(private val db: FirebaseFirestore) {
             "resourceUrl" to (post.resourceUrl ?: ""),
             "createdAt" to System.currentTimeMillis()
         )
-        suspendCancellableCoroutine { cont ->
-            db.trustListDataRoot()
-                .collection("posts")
-                .add(map)
-                .addOnSuccessListener { cont.resume(Unit) }
-                .addOnFailureListener { cont.resumeWithException(it) }
+        // BUG-014 fix: bound the wait on Firestore server ack so callers never hang.
+        firestoreWriteOrThrow {
+            suspendCancellableCoroutine<Unit> { cont ->
+                db.trustListDataRoot()
+                    .collection("posts")
+                    .add(map)
+                    .addOnSuccessListener { cont.resume(Unit) }
+                    .addOnFailureListener { cont.resumeWithException(it) }
+            }
+        }
+        // После успешной записи — пересчитать trustScore автору.
+        if (post.userId.isNotBlank()) {
+            trustScoreRepo.recalculateFor(post.userId)
         }
     }
 }

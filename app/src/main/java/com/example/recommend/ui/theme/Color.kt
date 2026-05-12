@@ -17,6 +17,10 @@ val AppSurface = Color(0xFF1A3328)
 val AppWhite = Color(0xFFFFFFFF)
 val AppError = Color(0xFFCC4444)
 val AppErrorContainer = Color(0xFFFFEEED)
+// Positive feedback (e.g. password reset email sent). Sits in the Teal family
+// so it stays inside the Artisan Pastel system without introducing a new green.
+val AppSuccess = Color(0xFF1A9E8A)
+val AppSuccessContainer = Color(0xFFE0F8F4)
 val AppDisabled = Color(0xFFE8E8E8)
 val AppOnDisabled = Color(0xFF9E9E9E)
 

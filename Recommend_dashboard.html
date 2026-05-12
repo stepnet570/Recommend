@@ -1,0 +1,570 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Recommend · Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --violet:#7C6FE0;
+    --teal:#3BD4C0;
+    --dark:#1A2A24;
+    --bg:#F8F7F4;
+    --muted:#8A9A95;
+    --gold:#D4AF37;
+    --border:rgba(59,212,192,.18);
+    --white:#FFFFFF;
+    --surface-muted:#F0EEEB;
+    --red:#E55656;
+    --green:#2BB673;
+    --shadow:0 8px 28px rgba(26,42,36,.06);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--bg);color:var(--dark);font-family:"DM Sans",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+  body{min-height:100vh;padding:32px 20px 64px}
+  h1,h2,h3{font-family:"Syne",system-ui,sans-serif;letter-spacing:-.3px}
+  .wrap{max-width:1080px;margin:0 auto}
+
+  /* ── Header ── */
+  .head{
+    background:linear-gradient(135deg,var(--violet),var(--teal));
+    color:var(--white);
+    border-radius:28px;
+    padding:28px 32px;
+    box-shadow:var(--shadow);
+    margin-bottom:24px;
+    display:flex;flex-wrap:wrap;gap:24px;align-items:center;justify-content:space-between;
+  }
+  .head .title{display:flex;align-items:center;gap:14px}
+  .head .logo{
+    width:54px;height:54px;border-radius:16px;
+    background:rgba(255,255,255,.18);backdrop-filter:blur(8px);
+    display:grid;place-items:center;font-size:28px;
+  }
+  .head h1{font-size:26px;font-weight:800;margin-bottom:2px}
+  .head .sub{opacity:.85;font-size:14px}
+
+  .progress-block{min-width:240px;flex:1;max-width:360px}
+  .progress-bar{
+    background:rgba(255,255,255,.22);
+    height:10px;border-radius:99px;overflow:hidden;margin-top:6px;
+  }
+  .progress-bar > i{
+    display:block;height:100%;
+    background:linear-gradient(90deg,#fff,#fff);
+    border-radius:99px;
+    transition:width .5s ease;
+  }
+  .progress-meta{display:flex;justify-content:space-between;font-size:13px;font-weight:600}
+
+  /* ── Filter chips ── */
+  .filters{
+    display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;
+  }
+  .chip{
+    background:var(--white);
+    border:1.5px solid #E8E6E0;
+    border-radius:99px;
+    padding:8px 16px;font-size:13px;font-weight:600;color:var(--dark);
+    cursor:pointer;transition:all .15s ease;
+  }
+  .chip:hover{border-color:var(--violet)}
+  .chip.active{
+    background:linear-gradient(135deg,var(--violet),var(--teal));
+    color:var(--white);border-color:transparent;
+  }
+  .chip .count{
+    margin-left:6px;font-size:12px;opacity:.7;font-weight:500;
+  }
+
+  /* ── Section card ── */
+  .section{
+    background:var(--white);
+    border-radius:24px;
+    padding:24px 26px;
+    box-shadow:var(--shadow);
+    margin-bottom:18px;
+  }
+  .section-head{
+    display:flex;align-items:center;gap:12px;margin-bottom:16px;
+  }
+  .badge{
+    font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;
+    padding:4px 10px;border-radius:99px;
+  }
+  .b-blocker{background:rgba(229,86,86,.12);color:var(--red)}
+  .b-important{background:rgba(212,175,55,.16);color:var(--gold)}
+  .b-nice{background:rgba(124,111,224,.12);color:var(--violet)}
+  .b-done{background:rgba(43,182,115,.12);color:var(--green)}
+  .section h2{font-size:18px;font-weight:700;flex:1}
+  .section .count-pill{
+    background:var(--surface-muted);
+    color:var(--muted);
+    font-size:12px;font-weight:600;
+    padding:4px 10px;border-radius:99px;
+  }
+
+  /* ── Task row ── */
+  .task{
+    display:grid;
+    grid-template-columns:24px 1fr auto;
+    gap:14px;
+    padding:14px 0;
+    border-top:1px solid #EFEDE8;
+    align-items:flex-start;
+  }
+  .task:first-of-type{border-top:none}
+  .task .tcheck{
+    width:22px;height:22px;border-radius:7px;
+    border:2px solid #D6D3CC;
+    cursor:pointer;flex-shrink:0;display:grid;place-items:center;
+    margin-top:2px;transition:all .15s ease;
+    background:var(--white);
+  }
+  .task .tcheck:hover{border-color:var(--violet)}
+  .task.done .tcheck{
+    background:linear-gradient(135deg,var(--violet),var(--teal));
+    border-color:transparent;
+  }
+  .task.done .tcheck::after{
+    content:"";width:10px;height:6px;
+    border-left:2px solid #fff;border-bottom:2px solid #fff;
+    transform:rotate(-45deg) translate(1px,-1px);
+  }
+  .task .tbody h3{
+    font-family:"DM Sans",sans-serif;
+    font-size:15px;font-weight:600;margin-bottom:4px;line-height:1.3;
+  }
+  .task .tbody p{
+    font-size:13.5px;color:var(--muted);line-height:1.5;
+  }
+  .task.done .tbody h3,
+  .task.done .tbody p{
+    text-decoration:line-through;opacity:.55;
+  }
+  .task .meta{
+    display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;
+  }
+  .meta-chip{
+    background:var(--surface-muted);
+    color:var(--muted);
+    font-size:11.5px;font-weight:500;
+    padding:3px 8px;border-radius:6px;
+    font-family:"SF Mono",ui-monospace,monospace;
+  }
+  .meta-chip.time{background:rgba(124,111,224,.10);color:var(--violet);font-family:"DM Sans",sans-serif;font-weight:600}
+  .task .tright{
+    font-size:11px;color:var(--muted);font-weight:600;
+    text-transform:uppercase;letter-spacing:.5px;
+    text-align:right;
+    margin-top:4px;
+  }
+
+  /* ── Hide rows when filter excludes them ── */
+  .section[data-hidden="1"]{display:none}
+
+  /* ── Footer / actions ── */
+  .actions{
+    display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;
+  }
+  .btn{
+    background:var(--white);
+    border:1.5px solid #E8E6E0;
+    border-radius:99px;
+    padding:10px 18px;font-size:13px;font-weight:600;color:var(--dark);
+    cursor:pointer;transition:all .15s ease;font-family:inherit;
+  }
+  .btn:hover{border-color:var(--violet);color:var(--violet)}
+  .btn.primary{
+    background:linear-gradient(135deg,var(--violet),var(--teal));
+    color:var(--white);border-color:transparent;
+  }
+  .btn.primary:hover{color:var(--white);opacity:.92}
+
+  .footer{
+    margin-top:28px;text-align:center;
+    color:var(--muted);font-size:12px;
+  }
+
+  @media (max-width:640px){
+    body{padding:18px 12px 40px}
+    .head{padding:22px 22px;border-radius:22px}
+    .head h1{font-size:22px}
+    .section{padding:20px 18px;border-radius:20px}
+    .task{grid-template-columns:22px 1fr;}
+    .task .tright{display:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ─── HEADER ─── -->
+  <div class="head">
+    <div class="title">
+      <div class="logo">🐺</div>
+      <div>
+        <h1>Recommend · Dashboard</h1>
+        <div class="sub">Контроль готовности к закрытому тесту</div>
+      </div>
+    </div>
+    <div class="progress-block">
+      <div class="progress-meta">
+        <span id="progress-text">0 / 0</span>
+        <span id="progress-pct">0%</span>
+      </div>
+      <div class="progress-bar"><i id="progress-fill" style="width:0%"></i></div>
+      <div class="progress-meta" style="margin-top:6px;opacity:.85;font-weight:500">
+        <span id="blockers-left">— блокеров осталось</span>
+        <span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── FILTERS ─── -->
+  <div class="filters">
+    <button class="chip active" data-filter="all">Все <span class="count" id="c-all">0</span></button>
+    <button class="chip" data-filter="blocker">🔴 Блокеры <span class="count" id="c-blocker">0</span></button>
+    <button class="chip" data-filter="important">🟡 Важно для теста <span class="count" id="c-important">0</span></button>
+    <button class="chip" data-filter="nice">🟢 После теста <span class="count" id="c-nice">0</span></button>
+    <button class="chip" data-filter="done-list">✅ Уже сделано <span class="count" id="c-done-list">0</span></button>
+    <button class="chip" data-filter="open">⏳ Только незакрытые <span class="count" id="c-open">0</span></button>
+  </div>
+
+  <div id="sections"></div>
+
+  <div class="actions">
+    <button class="btn" onclick="resetAll()">Сбросить все галочки</button>
+    <button class="btn primary" onclick="exportState()">Экспорт состояния</button>
+  </div>
+
+  <div class="footer">
+    Файл сохраняется в браузере. Открывай этот же файл в том же браузере — состояние подтянется.<br>
+    Путь: <code>Recommend_dashboard.html</code>
+  </div>
+</div>
+
+<script>
+/* ─── Data ─── */
+const SECTIONS = [
+  {
+    id:"blocker",
+    badge:"Блокеры",
+    badgeClass:"b-blocker",
+    title:"Без этого тест не запустить",
+    tasks:[
+      {
+        id:"b1",
+        title:"Убрать дефолты authorName=\"Alex\" / authorHandle=\"@alex\"",
+        desc:"В data/model/Post.kt:14–15. Если пост создаётся без явного автора — у всех будет «Alex». Поставить пустые строки и заполнять в PostRepository из currentUser.",
+        files:["data/model/Post.kt"],
+        time:"15 мин"
+      },
+      {
+        id:"b2",
+        title:"app_name = \"Recommend\" — проверено",
+        desc:"res/values/strings.xml уже содержит «Recommend» — иконка на телефоне подписана правильно. Задача закрыта.",
+        files:["res/values/strings.xml"],
+        time:"2 мин"
+      },
+      {
+        id:"b3",
+        title:"Сменить applicationId на финальный",
+        desc:"app/build.gradle.kts:12 = \"com.example.recommend\" — это дефолт Android Studio. Поменять на io.recommend.app (или итоговый) ДО первого билда в App Distribution.",
+        files:["app/build.gradle.kts"],
+        time:"10 мин"
+      },
+      {
+        id:"b4",
+        title:"Подключить Firebase Crashlytics",
+        desc:"Без отчётности о падениях ты не узнаешь, на чём ломается у тестеров. Добавить firebase-crashlytics-ktx + плагин com.google.firebase.crashlytics.",
+        files:["app/build.gradle.kts","build.gradle.kts"],
+        time:"20 мин"
+      },
+      {
+        id:"b5",
+        title:"Настроить Firebase App Distribution",
+        desc:"Канал доставки APK тестерам без Play Console. Создать группу тестеров, gradle plugin, первая раздача через CLI или UI.",
+        files:["console.firebase.google.com"],
+        time:"40 мин"
+      }
+    ]
+  },
+  {
+    id:"important",
+    badge:"Важно для теста",
+    badgeClass:"b-important",
+    title:"Без этого тест пройдёт, но без ключевой механики",
+    tasks:[
+      {
+        id:"i1",
+        title:"Логика пересчёта TrustScore",
+        desc:"Поле в UserProfile есть, но никакого пересчёта на новый рейтинг/принятый оффер/follow нет. Минимально: avg рейтингов × коэффициент активности. Без этого «доверие к источнику» не проверить.",
+        files:["UserRepository.kt","data/model/UserProfile.kt"],
+        time:"3–4 ч"
+      },
+      {
+        id:"i2",
+        title:"Экран TrustCoins Wallet + история транзакций",
+        desc:"Транзакции пишутся в коллекцию transactions, но UI просмотра нет. Бизнес после кампании не понимает, куда ушли коины.",
+        files:["new: WalletScreen.kt","data/repository/—"],
+        time:"4–6 ч"
+      },
+      {
+        id:"i3",
+        title:"Push-уведомления (FCM)",
+        desc:"Сейчас firebase-messaging вообще не подключён. Без push'ей retention в тесте резко падает. Минимум: новый Pack Call от подписки, принят твой оффер.",
+        files:["app/build.gradle.kts","new: MessagingService"],
+        time:"3–5 ч"
+      },
+      {
+        id:"i4",
+        title:"First-launch онбординг",
+        desc:"После Sign-up юзер сразу в фиде. Что такое pack, зачем фолловить, что такое Pack Call — нигде. Достаточно 3-screen welcome carousel.",
+        files:["new: ui/onboarding/WelcomeScreen.kt"],
+        time:"3 ч"
+      },
+      {
+        id:"i5",
+        title:"Сид тестовых данных",
+        desc:"У нового тестера фид пустой (он никого не зафолловил). Либо seed-скрипт (10 постов, 5 офферов, 3 Pack Call), либо «follow recommended on first launch».",
+        files:["new: SeedScript / Cloud Function"],
+        time:"2 ч"
+      },
+      {
+        id:"i6",
+        title:"isMinifyEnabled = true для release",
+        desc:"Сейчас false → APK на 2-3× жирнее. Не блокер, но качество билда страдает. Проверить ProGuard правила для Firestore data classes.",
+        files:["app/build.gradle.kts"],
+        time:"30 мин"
+      },
+      {
+        id:"i7",
+        title:"App Check: Play Integrity для release",
+        desc:"Сейчас только debug-provider. Релиз-билд тестера может получить PERMISSION_DENIED от Firestore. Добавить firebase-appcheck-playintegrity в release.",
+        files:["app/build.gradle.kts","MainActivity.kt"],
+        time:"45 мин"
+      },
+      {
+        id:"i8",
+        title:"Privacy Policy + Terms (хотя бы ссылки)",
+        desc:"Для App Distribution не критично, но в Sign-up форме нужна ссылка/чекбокс перед публикацией в Play. Сделать MD-страницу + ссылку из Auth и Profile.",
+        files:["AuthScreen.kt","ProfileScreen.kt"],
+        time:"1 ч"
+      }
+    ]
+  },
+  {
+    id:"nice",
+    badge:"После теста",
+    badgeClass:"b-nice",
+    title:"Можно отложить на второй круг тестов",
+    tasks:[
+      {
+        id:"n1",
+        title:"Пагинация во всех репозиториях",
+        desc:"PostRepository уже умеет, остальные (UserRepository, OfferRepository, RequestRepository) грузят всё одним get'ом. Скейл проблемы при росте.",
+        files:["data/repository/*"],
+        time:"4–6 ч"
+      },
+      {
+        id:"n2",
+        title:"Business Dashboard аналитика",
+        desc:"Сколько постов создано по кампании, охват, просмотры. Нужны просмотры по постам в Firestore.",
+        files:["new: BusinessAnalyticsScreen.kt"],
+        time:"6–8 ч"
+      },
+      {
+        id:"n3",
+        title:"Deep links / шеринг наружу",
+        desc:"Расшарить пост или коллекцию ссылкой (Firebase Dynamic Links / App Links). Виральный механик.",
+        files:["AndroidManifest.xml","navigation/*"],
+        time:"4–6 ч"
+      },
+      {
+        id:"n4",
+        title:"Коллекции: edit + add post to collection",
+        desc:"Создание есть, редактирование/удаление поста из коллекции — нет.",
+        files:["CollectionDetailScreen.kt","CollectionRepository.kt"],
+        time:"2–3 ч"
+      },
+      {
+        id:"n5",
+        title:"Уменьшить параметры в AppNavigation (20+)",
+        desc:"Технический долг из CLAUDE.md. Завести overlay state holder вместо плоского списка.",
+        files:["navigation/AppNavigation.kt"],
+        time:"3–4 ч"
+      }
+    ]
+  },
+  {
+    id:"done-list",
+    badge:"Уже готово",
+    badgeClass:"b-done",
+    title:"Проверено в коде — работает",
+    preChecked:true,
+    tasks:[
+      {id:"d1", title:"Регистрация + Sign-in + Forgot password (с email reset)", files:["ui/auth/AuthScreen.kt"], time:"—"},
+      {id:"d2", title:"Загрузка фото в Firebase Storage + сжатие", files:["ImageCompress.kt","ui/add/AddScreen.kt","ui/profile/ProfileScreen.kt"], time:"—"},
+      {id:"d3", title:"Follow / Unfollow + фильтр фида по following[]", files:["PublicUserProfileScreen.kt","ExploreScreen.kt","FeedViewModel.kt"], time:"—"},
+      {id:"d4", title:"Комментарии к постам", files:["data/repository/CommentRepository.kt","PostDetailScreen.kt"], time:"—"},
+      {id:"d5", title:"Atomic offer acceptance (slots/expiry/баланс/transactions)", files:["data/AcceptOfferTransaction.kt"], time:"—"},
+      {id:"d6", title:"Switch to Business + welcome-бонус +50 TC", files:["UserRepository.switchToBusiness"], time:"—"},
+      {id:"d7", title:"MonetizationOnboardingSheet для бизнеса", files:["ui/onboarding/MonetizationOnboardingSheet.kt"], time:"—"},
+      {id:"d8", title:"Firebase Analytics + Storage + AppCheck (debug) подключены", files:["app/build.gradle.kts"], time:"—"},
+      {id:"d9", title:"TrustScoreRing UI компонент", files:["ui/feed/FeedScreen.kt"], time:"—"},
+      {id:"d10", title:"Watchdog'и на сетевые операции (BUG-001 … BUG-019)", files:["data/FirestoreTimeout.kt","AuthScreen.kt"], time:"—"}
+    ]
+  }
+];
+
+/* ─── State (localStorage) ─── */
+const STORAGE_KEY = "trustlist-dashboard-v1";
+function loadState(){
+  try{return JSON.parse(localStorage.getItem(STORAGE_KEY)||"{}")}catch(e){return{}}
+}
+function saveState(s){localStorage.setItem(STORAGE_KEY,JSON.stringify(s))}
+
+let state = loadState();
+// preCheck "done-list" tasks on first run
+SECTIONS.forEach(sec=>{
+  if(sec.preChecked){
+    sec.tasks.forEach(t=>{ if(state[t.id]===undefined) state[t.id]=true; });
+  }
+});
+saveState(state);
+
+/* ─── Render ─── */
+const sectionsEl = document.getElementById("sections");
+
+function render(){
+  sectionsEl.innerHTML = "";
+  SECTIONS.forEach(sec=>{
+    const sectionEl = document.createElement("section");
+    sectionEl.className = "section";
+    sectionEl.dataset.section = sec.id;
+    const doneInSec = sec.tasks.filter(t=>state[t.id]).length;
+    sectionEl.innerHTML = `
+      <div class="section-head">
+        <span class="badge ${sec.badgeClass}">${sec.badge}</span>
+        <h2>${sec.title}</h2>
+        <span class="count-pill">${doneInSec} / ${sec.tasks.length}</span>
+      </div>
+      <div class="tasks"></div>
+    `;
+    const tasksEl = sectionEl.querySelector(".tasks");
+    sec.tasks.forEach(t=>{
+      const isDone = !!state[t.id];
+      const row = document.createElement("div");
+      row.className = "task" + (isDone?" done":"");
+      row.dataset.taskId = t.id;
+      const filesHtml = (t.files||[]).map(f=>`<span class="meta-chip">${f}</span>`).join("");
+      const timeHtml = t.time && t.time!=="—" ? `<span class="meta-chip time">⏱ ${t.time}</span>` : "";
+      row.innerHTML = `
+        <div class="tcheck"></div>
+        <div class="tbody">
+          <h3>${t.title}</h3>
+          ${t.desc?`<p>${t.desc}</p>`:""}
+          <div class="meta">${timeHtml}${filesHtml}</div>
+        </div>
+        <div class="tright">${t.id.toUpperCase()}</div>
+      `;
+      row.querySelector(".tcheck").addEventListener("click",()=>{
+        state[t.id] = !state[t.id];
+        saveState(state);
+        render();
+      });
+      tasksEl.appendChild(row);
+    });
+    sectionsEl.appendChild(sectionEl);
+  });
+  applyFilter();
+  updateProgress();
+}
+
+/* ─── Filters ─── */
+let currentFilter = "all";
+document.querySelectorAll(".chip").forEach(chip=>{
+  chip.addEventListener("click",()=>{
+    document.querySelectorAll(".chip").forEach(c=>c.classList.remove("active"));
+    chip.classList.add("active");
+    currentFilter = chip.dataset.filter;
+    applyFilter();
+  });
+});
+function applyFilter(){
+  document.querySelectorAll(".section").forEach(sec=>{
+    const id = sec.dataset.section;
+    let show = true;
+    if(currentFilter==="open"){
+      // hide rows that are done; hide section if nothing left
+      const rows = sec.querySelectorAll(".task");
+      let visible = 0;
+      rows.forEach(r=>{
+        const done = r.classList.contains("done");
+        r.style.display = done ? "none":"";
+        if(!done) visible++;
+      });
+      show = visible>0;
+    } else {
+      sec.querySelectorAll(".task").forEach(r=>r.style.display="");
+      if(currentFilter!=="all") show = (id===currentFilter);
+    }
+    sec.dataset.hidden = show?"0":"1";
+  });
+}
+
+/* ─── Progress (excludes the "done-list" reference section) ─── */
+function updateProgress(){
+  const work = SECTIONS.filter(s=>s.id!=="done-list").flatMap(s=>s.tasks);
+  const done = work.filter(t=>state[t.id]).length;
+  const total = work.length;
+  const pct = total ? Math.round(done/total*100) : 0;
+  document.getElementById("progress-text").textContent = `${done} / ${total}`;
+  document.getElementById("progress-pct").textContent = `${pct}%`;
+  document.getElementById("progress-fill").style.width = pct+"%";
+
+  const blockers = SECTIONS.find(s=>s.id==="blocker").tasks;
+  const blockersLeft = blockers.filter(t=>!state[t.id]).length;
+  document.getElementById("blockers-left").textContent =
+    blockersLeft===0 ? "✓ блокеров не осталось" : `${blockersLeft} блокер(а/ов) осталось`;
+
+  // Per-filter counts
+  document.getElementById("c-all").textContent = work.length;
+  document.getElementById("c-blocker").textContent = SECTIONS.find(s=>s.id==="blocker").tasks.length;
+  document.getElementById("c-important").textContent = SECTIONS.find(s=>s.id==="important").tasks.length;
+  document.getElementById("c-nice").textContent = SECTIONS.find(s=>s.id==="nice").tasks.length;
+  document.getElementById("c-done-list").textContent = SECTIONS.find(s=>s.id==="done-list").tasks.length;
+  document.getElementById("c-open").textContent = work.filter(t=>!state[t.id]).length;
+}
+
+/* ─── Actions ─── */
+function resetAll(){
+  if(!confirm("Сбросить все галочки во всех разделах?")) return;
+  state = {};
+  // re-pre-check "done"
+  SECTIONS.forEach(sec=>{
+    if(sec.preChecked) sec.tasks.forEach(t=>state[t.id]=true);
+  });
+  saveState(state);
+  render();
+}
+function exportState(){
+  const out = SECTIONS.map(sec=>{
+    const lines = sec.tasks.map(t=>`  [${state[t.id]?"x":" "}] ${t.title}`);
+    return `## ${sec.badge} — ${sec.title}\n${lines.join("\n")}`;
+  }).join("\n\n");
+  const blob = new Blob([out],{type:"text/plain"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "trustlist-tasks.md";
+  a.click(); URL.revokeObjectURL(url);
+}
+
+render();
+</script>
+</body>
+</html>
